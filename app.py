@@ -41,6 +41,25 @@ REGIME_COLORS = {
     "Senior Administration": "#e45f56",
     "Exceptional Administration": "#7c4cc2",
 }
+
+def safe_to_datetime(series_or_value):
+    """
+    Robust datetime parser for CDSS fields that may contain mixed formats,
+    timezone-aware strings, plain dates, blanks, or unexpected objects.
+    """
+    if isinstance(series_or_value, pd.Series):
+        s = series_or_value.astype("string").str.strip()
+        s = s.replace({"": pd.NA, "NaT": pd.NA, "None": pd.NA, "nan": pd.NA})
+        return pd.to_datetime(s, errors="coerce", format="mixed", utc=False)
+    if pd.isna(series_or_value):
+        return pd.NaT
+    return pd.to_datetime(str(series_or_value).strip(), errors="coerce", format="mixed", utc=False)
+
+def ensure_column(df, column_name, default=pd.NA):
+    """Guarantee a column exists before downstream parsing."""
+    if column_name not in df.columns:
+        df[column_name] = default
+    return df
 INCLUDED_WDS = {1, 3, 69}
 EXCLUDED_WDS = {2, 4, 5, 6, 7, 8, 9}
 
@@ -238,7 +257,7 @@ def fetch_recent_flow_live(abbrev="CLAFTCCO", days=120):
             if not date_candidates or not value_candidates:
                 continue
             out = pd.DataFrame({
-                "date": pd.to_datetime(df[date_candidates[0]], errors="coerce"),
+                "date": safe_to_datetime(df[date_candidates[0]]),
                 "flow_cfs": pd.to_numeric(df[value_candidates[0]], errors="coerce"),
             }).dropna()
             if not out.empty:
@@ -291,8 +310,10 @@ def build_current_regime_from_live(active_calls):
             "source": "live active calls",
         }
     df = active_calls.copy()
-    df["set_dt"] = pd.to_datetime(df["Date Time Set"], errors="coerce")
-    df["priority_dt"] = pd.to_datetime(df["Priority Date"], errors="coerce")
+    df = ensure_column(df, "Date Time Set")
+    df = ensure_column(df, "Priority Date")
+    df["set_dt"] = safe_to_datetime(df["Date Time Set"])
+    df["priority_dt"] = safe_to_datetime(df["Priority Date"])
     classified = df.apply(lambda r: classify_regime(r["set_dt"], r["priority_dt"]), axis=1, result_type="expand")
     classified.columns = ["regime", "severity", "score"]
     df = pd.concat([df, classified], axis=1)
