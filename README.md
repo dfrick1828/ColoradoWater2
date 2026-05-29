@@ -24,3 +24,8 @@ Upload all files to GitHub and deploy on Streamlit Cloud with `app.py`.
 ## Current call selection
 
 The live current-call display now uses the most recently set active call from the included districts, rather than the most severe active call.
+
+
+## Same-day call-depth percentile
+
+The landing-page "Today's condition" metric now compares the current call-depth/severity score against historical observations for the same day of year, rather than against all days in the record. If exact day-of-year history is sparse, the app falls back to a +/- 7 day seasonal window.
