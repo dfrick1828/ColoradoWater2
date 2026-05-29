@@ -27,6 +27,29 @@ REGIME_COLORS = {
     "Exceptional Administration": "#7c4cc2",
 }
 
+def apply_expert_probability_overlay(prob_series, current_regime, selected_date):
+    """
+    Expert-rule overlay.
+
+    Statistical models can assign probability to Free River because free-river
+    outcomes exist elsewhere in the historical record. Operationally, however,
+    if the basin is already in active administration during the irrigation/admin
+    season, Free River is not a realistic 30-day outcome. In that condition,
+    remove Free River from the probability distribution and renormalize.
+    """
+    adjusted = prob_series.copy().astype(float)
+    month = int(pd.Timestamp(selected_date).month)
+    irrigation_admin_season = 4 <= month <= 10
+    active_admin = current_regime != "Free River"
+
+    if irrigation_admin_season and active_admin:
+        adjusted.loc["Free River"] = 0.0
+        total = adjusted.sum()
+        if total > 0:
+            adjusted = adjusted / total
+
+    return adjusted
+
 st.markdown("""
 <style>
 [data-testid="stAppViewContainer"] {
@@ -157,9 +180,11 @@ row = row.iloc[-1:]
 
 X = row[FEATURES].fillna(model_df[FEATURES].median(numeric_only=True))
 prob = clf.predict_proba(X)[0]
-prob_series = pd.Series(prob, index=le.inverse_transform(np.arange(len(prob)))).reindex(REGIME_ORDER, fill_value=0).sort_values(ascending=False)
+raw_prob_series = pd.Series(prob, index=le.inverse_transform(np.arange(len(prob)))).reindex(REGIME_ORDER, fill_value=0)
 
 current_regime = row.iloc[0]["regime"]
+prob_series = apply_expert_probability_overlay(raw_prob_series, current_regime, selected_date).sort_values(ascending=False)
+
 hist_pct = row.iloc[0]["historical_percentile"]
 score = row.iloc[0]["score"]
 priority = row.iloc[0].get("controlling_priority_date", "—")
@@ -210,7 +235,7 @@ with left:
         font=dict(color="#edf4f7"),
     )
     st.plotly_chart(fig, use_container_width=True)
-    st.markdown('<div class="note">Historical-only prototype. No live CDSS calls. Designed to be stable on Streamlit Cloud.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="note">Historical-only prototype with expert-rule overlay. If active administration is already underway during irrigation season, Free River is removed as a 30-day outcome.</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
 with right:
@@ -276,7 +301,16 @@ with st.expander("About this prototype"):
 This version intentionally uses only the historical datasets already developed in this project.
 It avoids live CDSS API calls so the Streamlit deployment is stable. The date selector lets you
 simulate what the dashboard would have shown on a chosen historical date.
+
+The displayed probability distribution includes an expert-rule overlay: during the irrigation/admin
+season, if the basin is already in active administration, Free River is treated as an unrealistic
+30-day outcome and its probability is reassigned across the remaining regimes.
 """)
+    compare = pd.DataFrame({
+        "Raw model probability": raw_prob_series.reindex(REGIME_ORDER),
+        "Expert-adjusted probability": prob_series.reindex(REGIME_ORDER),
+    })
+    st.dataframe(compare.style.format("{:.1%}"), use_container_width=True)
     st.dataframe(row, use_container_width=True)
 
 st.markdown('<div class="note">Not an official forecast, legal opinion, or substitute for CDSS/DWR records.</div>', unsafe_allow_html=True)
