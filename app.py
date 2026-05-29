@@ -471,6 +471,204 @@ st.markdown("""
   .public-grid { grid-template-columns: 1fr; }
 }
 
+
+.story-hero {
+  min-height: 82vh;
+  border-radius: 34px;
+  padding: 46px;
+  background:
+    linear-gradient(90deg, rgba(3,10,15,.92), rgba(3,10,15,.60), rgba(3,10,15,.10)),
+    var(--poudre-bg);
+  background-size: cover;
+  background-position: center;
+  box-shadow: 0 36px 110px rgba(0,0,0,.46);
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.12);
+}
+.story-eyebrow {
+  color:#5ec9df;
+  font-size:12px;
+  letter-spacing:.18em;
+  text-transform:uppercase;
+  font-weight:900;
+}
+.story-title {
+  font-size: clamp(44px, 6.2vw, 78px);
+  line-height:.92;
+  letter-spacing:-.07em;
+  max-width: 900px;
+  margin: 18px 0 16px;
+  color:#f8fcff;
+  font-weight:950;
+}
+.story-subtitle {
+  max-width: 650px;
+  font-size: 20px;
+  line-height:1.42;
+  color:#dfeaf0;
+}
+.story-stress-card {
+  position:absolute;
+  left:46px;
+  bottom:42px;
+  width:min(560px, calc(100% - 92px));
+  padding:24px;
+  border-radius:28px;
+  background:rgba(5,14,21,.72);
+  border:1px solid rgba(255,255,255,.16);
+  backdrop-filter: blur(14px);
+}
+.story-stress-top {
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:18px;
+}
+.story-stress-number {
+  font-size:78px;
+  line-height:.86;
+  letter-spacing:-.07em;
+  font-weight:950;
+  color:white;
+}
+.story-stress-label {
+  font-size:12px;
+  letter-spacing:.15em;
+  text-transform:uppercase;
+  color:#aebbc4;
+  font-weight:900;
+}
+.story-stress-note {
+  color:#d5e1e7;
+  font-size:15px;
+  line-height:1.45;
+  margin-top:12px;
+}
+.story-track {
+  height:16px;
+  border-radius:999px;
+  background:linear-gradient(90deg,#5ec9df,#f1d36b,#f2a34a,#e45f56,#7c4cc2);
+  margin:16px 0 8px;
+  position:relative;
+}
+.story-marker {
+  position:absolute;
+  top:-8px;
+  width:4px;
+  height:32px;
+  border-radius:999px;
+  background:white;
+  box-shadow:0 0 0 5px rgba(255,255,255,.17), 0 10px 22px rgba(0,0,0,.4);
+}
+.story-scale {
+  display:flex;
+  justify-content:space-between;
+  color:#aebbc4;
+  font-size:12px;
+}
+.story-section {
+  margin-top:28px;
+  padding:38px;
+  border-radius:30px;
+  border:1px solid rgba(255,255,255,.10);
+  background:linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.024));
+  box-shadow:0 24px 70px rgba(0,0,0,.24);
+}
+.story-section h2 {
+  margin:0 0 12px;
+  color:#f6fbfd;
+  font-size:38px;
+  line-height:1;
+  letter-spacing:-.055em;
+}
+.story-section p {
+  color:#d5e1e7;
+  font-size:18px;
+  line-height:1.55;
+  max-width:950px;
+}
+.tile-grid {
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:18px;
+  margin-top:22px;
+}
+.visual-tile {
+  min-height:240px;
+  border-radius:26px;
+  overflow:hidden;
+  position:relative;
+  border:1px solid rgba(255,255,255,.11);
+  background-size:cover;
+  background-position:center;
+  box-shadow:0 18px 60px rgba(0,0,0,.28);
+}
+.visual-tile::after {
+  content:"";
+  position:absolute;
+  inset:0;
+  background:linear-gradient(180deg, rgba(0,0,0,.10), rgba(0,0,0,.72));
+}
+.tile-content {
+  position:absolute;
+  left:22px;
+  right:22px;
+  bottom:20px;
+  z-index:2;
+}
+.tile-content h3 {
+  margin:0 0 8px;
+  color:white;
+  font-size:26px;
+  line-height:1.05;
+  letter-spacing:-.04em;
+}
+.tile-content p {
+  margin:0;
+  color:#d9e6eb;
+  font-size:15px;
+  line-height:1.42;
+}
+.big-idea {
+  margin-top:28px;
+  border-radius:32px;
+  padding:42px;
+  background:
+    radial-gradient(circle at 12% 12%, rgba(94,201,223,.16), transparent 32%),
+    linear-gradient(135deg, rgba(18,31,42,.86), rgba(15,20,29,.86));
+  border:1px solid rgba(94,201,223,.18);
+}
+.big-idea h2 {
+  margin:0;
+  color:#f8fcff;
+  font-size:46px;
+  line-height:1.02;
+  letter-spacing:-.06em;
+  max-width:900px;
+}
+.big-idea p {
+  color:#d5e1e7;
+  font-size:18px;
+  line-height:1.55;
+  max-width:900px;
+}
+.story-button {
+  display:inline-block;
+  margin-top:18px;
+  padding:12px 18px;
+  border-radius:999px;
+  color:#071018;
+  background:#5ec9df;
+  font-weight:900;
+}
+@media (max-width:900px) {
+  .story-hero { min-height:760px; padding:28px; }
+  .story-stress-card { position:static; margin-top:90px; width:100%; }
+  .tile-grid { grid-template-columns:1fr; }
+  .story-section, .big-idea { padding:26px; }
+}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -591,59 +789,62 @@ if page == "Public Landing Page":
         bg = "url('https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1800&q=80')"
 
     st.markdown(f"""
-    <div class="public-hero" style="--poudre-bg: {bg};">
-      <div class="eyebrow">Northern Colorado Water Outlook</div>
-      <h1>How stressed is Northern Colorado's water supply?</h1>
-      <p>A simple public view of water conditions, water-right pressure, and what may be coming next.</p>
+    <div class="story-hero" style="--poudre-bg: {bg};">
+      <div class="story-eyebrow">Northern Colorado Water Outlook</div>
+      <div class="story-title">How stressed is Northern Colorado's water supply?</div>
+      <div class="story-subtitle">A public outlook for rivers, drought, and water-right administration — built to answer what the data actually means.</div>
 
-      <div class="stress-panel">
-        <div class="stress-label">Current water stress</div>
-        <div class="stress-number">{landing_pct:.0f}<span style="font-size:34px;color:#aebbc4;"> / 100</span></div>
-        <div class="stress-track"><div class="stress-marker" style="left:calc({marker:.1f}% - 2px);"></div></div>
-        <div class="stress-scale"><span>Low stress</span><span>Typical</span><span>High stress</span></div>
-        <div class="landing-subline">Higher than {landing_pct:.0f}% of daily conditions since 2005 · Current condition: {landing_public}</div>
+      <div class="story-stress-card">
+        <div class="story-stress-top">
+          <div>
+            <div class="story-stress-label">Current water stress</div>
+            <div class="story-stress-number">{landing_pct:.0f}<span style="font-size:34px;color:#aebbc4;"> / 100</span></div>
+          </div>
+          <div class="story-stress-label" style="text-align:right;">{landing_public}</div>
+        </div>
+        <div class="story-track"><div class="story-marker" style="left:calc({marker:.1f}% - 2px);"></div></div>
+        <div class="story-scale"><span>Low stress</span><span>Typical</span><span>High stress</span></div>
+        <div class="story-stress-note">Higher than {landing_pct:.0f}% of daily administrative conditions since 2005.</div>
       </div>
     </div>
     """, unsafe_allow_html=True)
 
     st.markdown("""
-    <div class="public-grid">
-      <div class="public-card">
-        <div class="public-icon">🏙️</div>
-        <h3>Cities</h3>
-        <p>Explains whether current river administration is routine or unusually tight.</p>
-      </div>
-      <div class="public-card">
-        <div class="public-icon">🚜</div>
-        <h3>Agriculture</h3>
-        <p>Shows when senior priorities are controlling the system and junior supplies are under pressure.</p>
-      </div>
-      <div class="public-card">
-        <div class="public-icon">🏞️</div>
-        <h3>Rivers</h3>
-        <p>Connects streamflow, drought, and water-right administration in one readable signal.</p>
-      </div>
-      <div class="public-card">
-        <div class="public-icon">🏌️</div>
-        <h3>Communities</h3>
-        <p>Makes water conditions easier to understand for residents and local decision makers.</p>
-      </div>
-    </div>
-
-    <div class="public-explainer">
+    <div class="story-section">
       <h2>Most water websites show data. This explains meaning.</h2>
       <p>
-      Snowpack, streamflow, and drought maps are useful, but they do not answer the question most people actually have:
-      <strong>What does this mean for water rights and water use?</strong>
-      This prototype turns historical call records, flow data, and expert water-right rules into a plain-English outlook.
+      Snowpack, streamflow, and drought maps are useful. But they do not answer the question people actually have:
+      <strong>what does this mean for water rights and water use?</strong>
       </p>
+      <div class="tile-grid">
+        <div class="visual-tile" style="background-image:url('https://images.unsplash.com/photo-1604537466573-5e94508fd243?auto=format&fit=crop&w=1000&q=80');">
+          <div class="tile-content">
+            <h3>Snowpack</h3>
+            <p>The seasonal water supply signal people already understand.</p>
+          </div>
+        </div>
+        <div class="visual-tile" style="background-image:url('https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=1000&q=80');">
+          <div class="tile-content">
+            <h3>Streamflow</h3>
+            <p>What is physically moving through the river today.</p>
+          </div>
+        </div>
+        <div class="visual-tile" style="background-image:url('https://images.unsplash.com/photo-1450101499163-c8848c66ca85?auto=format&fit=crop&w=1000&q=80');">
+          <div class="tile-content">
+            <h3>Water Rights</h3>
+            <p>The legal and administrative system that determines who can use water.</p>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <div class="public-explainer">
+    <div class="big-idea">
       <h2>A weather forecast for water rights.</h2>
       <p>
-      Not a legal opinion. Not a replacement for the State Engineer. A public-facing way to understand whether Northern Colorado water conditions are normal, tightening, or historically severe.
+      Not a legal opinion. Not a replacement for the State Engineer.
+      A clearer public interface for understanding whether Northern Colorado water conditions are normal, tightening, or historically severe.
       </p>
+      <span class="story-button">Open the Outlook Dashboard →</span>
     </div>
     """, unsafe_allow_html=True)
 
