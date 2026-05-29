@@ -19,3 +19,8 @@ The app sends the key using the `ApiKey` request header.
 ## Deploy
 
 Upload all files to GitHub and deploy on Streamlit Cloud with `app.py`.
+
+
+## Current call selection
+
+The live current-call display now uses the most recently set active call from the included districts, rather than the most severe active call.
