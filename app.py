@@ -250,7 +250,7 @@ st.markdown("""
   overflow: hidden;
 }
 .landing-hero h1 {
-  font-size: 72px;
+  font-size: 54px;
   line-height: .92;
   letter-spacing: -.07em;
   margin: 20px 0 18px;
@@ -259,7 +259,7 @@ st.markdown("""
 }
 .landing-hero p {
   max-width: 650px;
-  font-size: 23px;
+  font-size: 18px;
   line-height: 1.38;
   color: #dfeaf0;
 }
@@ -268,7 +268,7 @@ st.markdown("""
   left: 54px;
   bottom: 48px;
   max-width: 720px;
-  font-size: 28px;
+  font-size: 22px;
   line-height: 1.18;
   letter-spacing: -.035em;
   font-weight: 850;
@@ -303,7 +303,7 @@ st.markdown("""
   text-transform: uppercase;
 }
 .landing-card h3 {
-  font-size: 23px;
+  font-size: 18px;
   line-height: 1.08;
   letter-spacing: -.035em;
   margin: 11px 0 9px;
@@ -322,7 +322,7 @@ st.markdown("""
   background: linear-gradient(135deg, rgba(94,201,223,.09), rgba(124,76,194,.06));
 }
 .callout h2 {
-  font-size: 32px;
+  font-size: 26px;
   letter-spacing: -.045em;
   margin: 0 0 10px;
 }
@@ -441,7 +441,7 @@ default_date = min(latest_available, pd.Timestamp("2026-04-28"))
 
 
 if page == "Landing Page":
-    img64 = image_to_base64("assets/poudre_river_hero.png")
+    img64 = image_to_base64("assets/poudre_river_hero.jpg")
     if img64:
         bg = f"url('data:image/png;base64,{img64}')"
     else:
