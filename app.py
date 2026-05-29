@@ -669,6 +669,180 @@ st.markdown("""
   .story-section, .big-idea { padding:26px; }
 }
 
+
+.rights-hero {
+  min-height: 84vh;
+  border-radius: 34px;
+  padding: 48px;
+  background:
+    linear-gradient(90deg, rgba(3,10,15,.94), rgba(3,10,15,.64), rgba(3,10,15,.12)),
+    var(--poudre-bg);
+  background-size: cover;
+  background-position: center;
+  box-shadow: 0 36px 110px rgba(0,0,0,.46);
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.12);
+}
+.rights-title {
+  font-size: clamp(46px, 6.5vw, 84px);
+  line-height: .90;
+  letter-spacing: -.075em;
+  max-width: 980px;
+  margin: 18px 0 18px;
+  color:#f8fcff;
+  font-weight:950;
+}
+.rights-subtitle {
+  max-width: 720px;
+  font-size: 23px;
+  line-height:1.36;
+  color:#dfeaf0;
+}
+.rights-bottom {
+  position:absolute;
+  left:48px;
+  right:48px;
+  bottom:42px;
+  display:grid;
+  grid-template-columns: 1fr 360px;
+  gap:28px;
+  align-items:end;
+}
+.rights-thesis {
+  max-width:820px;
+  color:white;
+  font-size:30px;
+  line-height:1.16;
+  letter-spacing:-.04em;
+  font-weight:850;
+}
+.rights-mini-panel {
+  border:1px solid rgba(255,255,255,.16);
+  border-radius:26px;
+  padding:22px;
+  background:rgba(4,12,18,.68);
+  backdrop-filter: blur(12px);
+}
+.rights-mini-label {
+  color:#9eb0bc;
+  text-transform:uppercase;
+  letter-spacing:.16em;
+  font-weight:900;
+  font-size:12px;
+}
+.rights-mini-number {
+  color:white;
+  font-size:56px;
+  line-height:.9;
+  letter-spacing:-.06em;
+  font-weight:950;
+  margin:10px 0;
+}
+.rights-section {
+  margin-top:28px;
+  padding:38px;
+  border-radius:30px;
+  border:1px solid rgba(255,255,255,.10);
+  background:linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.024));
+  box-shadow:0 24px 70px rgba(0,0,0,.24);
+}
+.rights-section h2 {
+  margin:0 0 12px;
+  color:#f6fbfd;
+  font-size:40px;
+  line-height:1;
+  letter-spacing:-.055em;
+}
+.rights-section p {
+  color:#d5e1e7;
+  font-size:18px;
+  line-height:1.55;
+  max-width:980px;
+}
+.rights-grid {
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:18px;
+  margin-top:22px;
+}
+.rights-card {
+  border:1px solid rgba(255,255,255,.10);
+  border-radius:26px;
+  padding:24px;
+  min-height:210px;
+  background:linear-gradient(180deg, rgba(255,255,255,.060), rgba(255,255,255,.025));
+  box-shadow:0 18px 55px rgba(0,0,0,.22);
+}
+.rights-icon { font-size:34px; margin-bottom:14px; }
+.rights-card h3 {
+  margin:0 0 10px;
+  color:white;
+  font-size:27px;
+  letter-spacing:-.04em;
+  line-height:1.05;
+}
+.rights-card p {
+  margin:0;
+  color:#cbd8de;
+  font-size:15.5px;
+  line-height:1.5;
+}
+.call-timeline {
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:12px;
+  margin-top:26px;
+}
+.call-step {
+  border-radius:22px;
+  padding:20px;
+  min-height:130px;
+  border:1px solid rgba(255,255,255,.10);
+  background:rgba(255,255,255,.04);
+}
+.call-step strong {
+  display:block;
+  font-size:20px;
+  color:white;
+  margin-bottom:8px;
+}
+.call-step span {
+  color:#cbd8de;
+  font-size:14.5px;
+  line-height:1.4;
+}
+.rights-cta {
+  margin-top:28px;
+  border-radius:32px;
+  padding:42px;
+  background:
+    radial-gradient(circle at 12% 12%, rgba(94,201,223,.16), transparent 32%),
+    linear-gradient(135deg, rgba(18,31,42,.86), rgba(15,20,29,.86));
+  border:1px solid rgba(94,201,223,.18);
+}
+.rights-cta h2 {
+  margin:0;
+  color:#f8fcff;
+  font-size:46px;
+  line-height:1.02;
+  letter-spacing:-.06em;
+  max-width:900px;
+}
+.rights-cta p {
+  color:#d5e1e7;
+  font-size:18px;
+  line-height:1.55;
+  max-width:900px;
+}
+@media (max-width:900px) {
+  .rights-hero { min-height:800px; padding:30px; }
+  .rights-bottom { position:static; margin-top:80px; grid-template-columns:1fr; }
+  .rights-thesis { font-size:24px; }
+  .rights-grid, .call-timeline { grid-template-columns:1fr; }
+  .rights-section, .rights-cta { padding:26px; }
+}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -780,7 +954,6 @@ if page == "Public Landing Page":
     landing_regime = landing_row.iloc[0]["regime"]
     landing_pct = float(landing_row.iloc[0]["historical_percentile"])
     landing_public = PUBLIC_LABELS[landing_regime]
-    marker = max(0, min(100, landing_pct))
 
     img64 = image_to_base64("assets/poudre_river_hero.jpg")
     if img64:
@@ -789,62 +962,69 @@ if page == "Public Landing Page":
         bg = "url('https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1800&q=80')"
 
     st.markdown(f"""
-    <div class="story-hero" style="--poudre-bg: {bg};">
-      <div class="story-eyebrow">Northern Colorado Water Outlook</div>
-      <div class="story-title">How stressed is Northern Colorado's water supply?</div>
-      <div class="story-subtitle">A public outlook for rivers, drought, and water-right administration — built to answer what the data actually means.</div>
+    <div class="rights-hero" style="--poudre-bg: {bg};">
+      <div class="story-eyebrow">Northern Colorado Water Right Outlook</div>
+      <div class="rights-title">Water rights affect everyone.</div>
+      <div class="rights-subtitle">Almost nobody understands them. This prototype translates Colorado water-right administration into a public outlook.</div>
 
-      <div class="story-stress-card">
-        <div class="story-stress-top">
-          <div>
-            <div class="story-stress-label">Current water stress</div>
-            <div class="story-stress-number">{landing_pct:.0f}<span style="font-size:34px;color:#aebbc4;"> / 100</span></div>
-          </div>
-          <div class="story-stress-label" style="text-align:right;">{landing_public}</div>
+      <div class="rights-bottom">
+        <div class="rights-thesis">
+          Most water websites tell you how much water is in the river.<br>
+          This one tells you what that means for water rights.
         </div>
-        <div class="story-track"><div class="story-marker" style="left:calc({marker:.1f}% - 2px);"></div></div>
-        <div class="story-scale"><span>Low stress</span><span>Typical</span><span>High stress</span></div>
-        <div class="story-stress-note">Higher than {landing_pct:.0f}% of daily administrative conditions since 2005.</div>
+        <div class="rights-mini-panel">
+          <div class="rights-mini-label">Current water-right pressure</div>
+          <div class="rights-mini-number">{landing_pct:.0f}<span style="font-size:26px;color:#aebbc4;"> / 100</span></div>
+          <div class="landing-subline">Current condition: {landing_public}<br>Higher than {landing_pct:.0f}% of daily conditions since 2005.</div>
+        </div>
       </div>
     </div>
     """, unsafe_allow_html=True)
 
     st.markdown("""
-    <div class="story-section">
-      <h2>Most water websites show data. This explains meaning.</h2>
+    <div class="rights-section">
+      <h2>What are water rights?</h2>
       <p>
-      Snowpack, streamflow, and drought maps are useful. But they do not answer the question people actually have:
-      <strong>what does this mean for water rights and water use?</strong>
+      In Colorado, water is not simply used by whoever is closest to the river. Water is administered through a priority system that determines who can divert, when they can divert, and what happens when supply gets tight.
       </p>
-      <div class="tile-grid">
-        <div class="visual-tile" style="background-image:url('https://images.unsplash.com/photo-1604537466573-5e94508fd243?auto=format&fit=crop&w=1000&q=80');">
-          <div class="tile-content">
-            <h3>Snowpack</h3>
-            <p>The seasonal water supply signal people already understand.</p>
-          </div>
+      <div class="rights-grid">
+        <div class="rights-card">
+          <div class="rights-icon">🚜</div>
+          <h3>Agriculture</h3>
+          <p>Farms and ditches depend on water rights to deliver irrigation water during the growing season.</p>
         </div>
-        <div class="visual-tile" style="background-image:url('https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=1000&q=80');">
-          <div class="tile-content">
-            <h3>Streamflow</h3>
-            <p>What is physically moving through the river today.</p>
-          </div>
+        <div class="rights-card">
+          <div class="rights-icon">🏙️</div>
+          <h3>Cities</h3>
+          <p>Municipal water systems rely on water rights, storage, exchanges, and augmentation to serve homes and businesses.</p>
         </div>
-        <div class="visual-tile" style="background-image:url('https://images.unsplash.com/photo-1450101499163-c8848c66ca85?auto=format&fit=crop&w=1000&q=80');">
-          <div class="tile-content">
-            <h3>Water Rights</h3>
-            <p>The legal and administrative system that determines who can use water.</p>
-          </div>
+        <div class="rights-card">
+          <div class="rights-icon">🏞️</div>
+          <h3>Rivers</h3>
+          <p>Water-right administration affects flows, timing, storage, diversions, and how rivers behave during dry periods.</p>
         </div>
       </div>
     </div>
 
-    <div class="big-idea">
+    <div class="rights-section">
+      <h2>Why do people talk about “calls”?</h2>
+      <p>
+      When water is limited, senior water rights can place a call that limits junior diversions. The result is not just a low river — it is an administrative condition.
+      </p>
+      <div class="call-timeline">
+        <div class="call-step"><strong>Free River</strong><span>No meaningful call pressure. Water is generally available.</span></div>
+        <div class="call-step"><strong>Administration</strong><span>Rights are being administered by priority.</span></div>
+        <div class="call-step"><strong>Senior Call</strong><span>Older rights control the river and junior rights face pressure.</span></div>
+        <div class="call-step"><strong>Exceptional Stress</strong><span>Historically severe administration for the time of year.</span></div>
+      </div>
+    </div>
+
+    <div class="rights-cta">
       <h2>A weather forecast for water rights.</h2>
       <p>
-      Not a legal opinion. Not a replacement for the State Engineer.
-      A clearer public interface for understanding whether Northern Colorado water conditions are normal, tightening, or historically severe.
+      Colorado forecasts weather. Colorado forecasts drought. Colorado forecasts streamflow.
+      This project asks a different question: why not forecast water-right administration?
       </p>
-      <span class="story-button">Open the Outlook Dashboard →</span>
     </div>
     """, unsafe_allow_html=True)
 
