@@ -1,17 +1,12 @@
-# Northern Colorado Water Right Outlook — Historical Prototype
+# Northern Colorado Water Right Outlook — Public-Facing Prototype
 
-This is a stable Streamlit prototype that uses historical data only.
+This version adds a cinematic Poudre River landing page plus the historical outlook dashboard.
 
-It does **not** call live CDSS APIs, so it should deploy cleanly on Streamlit Cloud.
+It uses historical data only, avoids live CDSS API calls, and presents water-right administration in plain English.
 
 ## Deploy
 
-Upload these files to a GitHub repo:
+Upload all files to GitHub and deploy on Streamlit Cloud with:
 
-- `app.py`
-- `requirements.txt`
-- `README.md`
-- `.streamlit/config.toml`
-- `data/`
-
-Then deploy with Streamlit Cloud using `app.py`.
+- Main file: `app.py`
+- Requirements: `requirements.txt`
