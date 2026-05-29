@@ -340,6 +340,137 @@ st.markdown("""
   .landing-grid { grid-template-columns: 1fr; }
 }
 
+
+.public-hero {
+  min-height: 640px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 34px;
+  padding: 46px;
+  background:
+    linear-gradient(90deg, rgba(3,10,15,.94), rgba(3,10,15,.66), rgba(3,10,15,.20)),
+    var(--poudre-bg);
+  background-size: cover;
+  background-position: center;
+  box-shadow: 0 34px 100px rgba(0,0,0,.42);
+  position: relative;
+  overflow: hidden;
+}
+.public-hero h1 {
+  font-size: 48px;
+  line-height: .98;
+  letter-spacing: -.055em;
+  margin: 18px 0 12px;
+  max-width: 780px;
+  color: #f6fbfd;
+}
+.public-hero p {
+  max-width: 640px;
+  font-size: 18px;
+  line-height: 1.42;
+  color: #dfeaf0;
+}
+.stress-panel {
+  position:absolute;
+  left:46px;
+  bottom:42px;
+  width:min(620px, calc(100% - 92px));
+  border:1px solid rgba(255,255,255,.14);
+  border-radius:26px;
+  padding:24px;
+  background:rgba(4,12,18,.66);
+  backdrop-filter: blur(10px);
+}
+.stress-label {
+  color:#9eb0bc;
+  text-transform:uppercase;
+  letter-spacing:.16em;
+  font-weight:900;
+  font-size:12px;
+}
+.stress-number {
+  font-size:76px;
+  line-height:.9;
+  letter-spacing:-.06em;
+  font-weight:950;
+  margin:10px 0 10px;
+  color:#f6fbfd;
+}
+.stress-track {
+  height:18px;
+  border-radius:999px;
+  background:linear-gradient(90deg,#5ec9df,#f1d36b,#f2a34a,#e45f56,#7c4cc2);
+  position:relative;
+  margin:15px 0 8px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.18);
+}
+.stress-marker {
+  position:absolute;
+  top:-8px;
+  width:4px;
+  height:34px;
+  border-radius:999px;
+  background:white;
+  box-shadow:0 0 0 5px rgba(255,255,255,.16), 0 8px 16px rgba(0,0,0,.35);
+}
+.stress-scale {
+  display:flex;
+  justify-content:space-between;
+  color:#aebbc4;
+  font-size:12px;
+}
+.public-grid {
+  display:grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap:16px;
+  margin-top:22px;
+}
+.public-card {
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(255,255,255,.060), rgba(255,255,255,.025));
+  padding:20px;
+  min-height:150px;
+  box-shadow: 0 18px 55px rgba(0,0,0,.22);
+}
+.public-icon { font-size:28px; margin-bottom:10px; }
+.public-card h3 {
+  margin:0 0 8px;
+  font-size:20px;
+  letter-spacing:-.025em;
+  color:#f3f7f9;
+}
+.public-card p {
+  color:#cbd8de;
+  line-height:1.45;
+  font-size:14.5px;
+  margin:0;
+}
+.public-explainer {
+  margin-top:22px;
+  border:1px solid rgba(94,201,223,.22);
+  border-radius:24px;
+  padding:26px;
+  background: linear-gradient(135deg, rgba(94,201,223,.09), rgba(124,76,194,.06));
+}
+.public-explainer h2 {
+  margin:0 0 10px;
+  font-size:30px;
+  letter-spacing:-.04em;
+}
+.public-explainer p {
+  color:#d6e4ea;
+  font-size:16px;
+  line-height:1.55;
+  max-width:980px;
+}
+@media (max-width: 900px) {
+  .public-hero { min-height: 720px; padding: 28px; }
+  .public-hero h1 { font-size: 38px; }
+  .stress-panel { position:static; margin-top:70px; width:100%; }
+  .stress-number { font-size:58px; }
+  .public-grid { grid-template-columns: 1fr; }
+}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -432,7 +563,7 @@ clf, le = train_model(model_df)
 
 page = st.sidebar.radio(
     "View",
-    ["Landing Page", "Outlook Dashboard"],
+    ["Public Landing Page", "Outlook Dashboard"],
     index=0,
 )
 
@@ -440,50 +571,78 @@ latest_available = daily["date"].max()
 default_date = min(latest_available, pd.Timestamp("2026-04-28"))
 
 
-if page == "Landing Page":
+if page == "Public Landing Page":
+    landing_date = min(daily["date"].max(), pd.Timestamp("2026-04-28"))
+    landing_row = model_df[model_df["date"] == landing_date]
+    if landing_row.empty:
+        landing_row = model_df.iloc[[-1]]
+    else:
+        landing_row = landing_row.iloc[[-1]]
+
+    landing_regime = landing_row.iloc[0]["regime"]
+    landing_pct = float(landing_row.iloc[0]["historical_percentile"])
+    landing_public = PUBLIC_LABELS[landing_regime]
+    marker = max(0, min(100, landing_pct))
+
     img64 = image_to_base64("assets/poudre_river_hero.jpg")
     if img64:
-        bg = f"url('data:image/png;base64,{img64}')"
+        bg = f"url('data:image/jpeg;base64,{img64}')"
     else:
         bg = "url('https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1800&q=80')"
 
     st.markdown(f"""
-    <div class="landing-hero" style="--poudre-bg: {bg};">
-      <div class="eyebrow">Northern Colorado Water Right Outlook</div>
-      <h1>Water forecasts exist.<br>Water-right forecasts don't.</h1>
-      <p>A public-facing prototype for understanding how Northern Colorado rivers are being administered — and what may be coming next.</p>
-      <div class="landing-thesis">
-        Most water sites tell you how much water is in the river.
-        <br>This one explains what it means for water rights.
-        <div class="landing-subline">South Platte / Cache la Poudre historical prototype · Administrative calls · Flow data · Expert regime rules</div>
+    <div class="public-hero" style="--poudre-bg: {bg};">
+      <div class="eyebrow">Northern Colorado Water Outlook</div>
+      <h1>How stressed is Northern Colorado's water supply?</h1>
+      <p>A simple public view of water conditions, water-right pressure, and what may be coming next.</p>
+
+      <div class="stress-panel">
+        <div class="stress-label">Current water stress</div>
+        <div class="stress-number">{landing_pct:.0f}<span style="font-size:34px;color:#aebbc4;"> / 100</span></div>
+        <div class="stress-track"><div class="stress-marker" style="left:calc({marker:.1f}% - 2px);"></div></div>
+        <div class="stress-scale"><span>Low stress</span><span>Typical</span><span>High stress</span></div>
+        <div class="landing-subline">Higher than {landing_pct:.0f}% of daily conditions since 2005 · Current condition: {landing_public}</div>
       </div>
     </div>
     """, unsafe_allow_html=True)
 
     st.markdown("""
-    <div class="landing-grid">
-      <div class="landing-card">
-        <div class="landing-number">01</div>
-        <h3>Plain English</h3>
-        <p>Translates water-right administration into understandable conditions: available, tightening, typical, senior, or exceptional.</p>
+    <div class="public-grid">
+      <div class="public-card">
+        <div class="public-icon">🏙️</div>
+        <h3>Cities</h3>
+        <p>Explains whether current river administration is routine or unusually tight.</p>
       </div>
-      <div class="landing-card">
-        <div class="landing-number">02</div>
-        <h3>Historical Context</h3>
-        <p>Shows whether today's conditions are routine, unusual, or severe compared with the daily record since 2005.</p>
+      <div class="public-card">
+        <div class="public-icon">🚜</div>
+        <h3>Agriculture</h3>
+        <p>Shows when senior priorities are controlling the system and junior supplies are under pressure.</p>
       </div>
-      <div class="landing-card">
-        <div class="landing-number">03</div>
-        <h3>30-Day Outlook</h3>
-        <p>Uses historical patterns and expert rules to estimate the likely administrative condition in the weeks ahead.</p>
+      <div class="public-card">
+        <div class="public-icon">🏞️</div>
+        <h3>Rivers</h3>
+        <p>Connects streamflow, drought, and water-right administration in one readable signal.</p>
+      </div>
+      <div class="public-card">
+        <div class="public-icon">🏌️</div>
+        <h3>Communities</h3>
+        <p>Makes water conditions easier to understand for residents and local decision makers.</p>
       </div>
     </div>
 
-    <div class="callout">
+    <div class="public-explainer">
+      <h2>Most water websites show data. This explains meaning.</h2>
+      <p>
+      Snowpack, streamflow, and drought maps are useful, but they do not answer the question most people actually have:
+      <strong>What does this mean for water rights and water use?</strong>
+      This prototype turns historical call records, flow data, and expert water-right rules into a plain-English outlook.
+      </p>
+    </div>
+
+    <div class="public-explainer">
       <h2>A weather forecast for water rights.</h2>
       <p>
-      Not a legal opinion. Not a replacement for the State Engineer.
-      A clearer way for the public to understand what river conditions mean for water rights, farms, cities, reservoirs, and communities.
+      Not a legal opinion. Not a replacement for the State Engineer. A public-facing way to understand whether Northern Colorado water conditions are normal, tightening, or historically severe.
       </p>
     </div>
     """, unsafe_allow_html=True)
