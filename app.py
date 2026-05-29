@@ -1,8 +1,10 @@
 
+import os
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
+import requests
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import LabelEncoder
 
@@ -60,6 +62,188 @@ PUBLIC_EXPLAIN = {
     "Senior Administration": "Senior priorities are controlling the river system, indicating meaningful pressure on junior water rights.",
     "Exceptional Administration": "Administration is unusually restrictive for this time of year and historically rare.",
 }
+
+
+# -----------------------------
+# CDSS live API integration
+# -----------------------------
+CDSS_BASE_URL = "https://dwr.state.co.us/Rest/GET/api/v2"
+INCLUDED_WDS = {1, 3, 69}
+EXCLUDED_WDS = {2, 4, 5, 6, 7, 8, 9}
+
+def get_cdss_api_key():
+    """Optional: set CDSS_API_KEY in Streamlit secrets or environment."""
+    try:
+        key = st.secrets.get("CDSS_API_KEY", "")
+        if key:
+            return key
+    except Exception:
+        pass
+    return os.environ.get("CDSS_API_KEY", "")
+
+def parse_cdss_date(value):
+    """Parse CDSS date strings safely one value at a time."""
+    if value is None or pd.isna(value):
+        return pd.NaT
+    s = str(value).strip()
+    if s in {"", "None", "nan", "NaN", "NaT", "<NA>"}:
+        return pd.NaT
+    try:
+        # CDSS often returns ISO strings with offsets. Parse as UTC, then strip tz.
+        ts = pd.to_datetime(s, errors="coerce", utc=True)
+        if pd.isna(ts):
+            return pd.NaT
+        return ts.tz_convert(None)
+    except Exception:
+        try:
+            cleaned = s.replace("T", " ").replace("Z", "")
+            if len(cleaned) > 6 and cleaned[-6] in ["+", "-"] and cleaned[-3] == ":":
+                cleaned = cleaned[:-6]
+            return pd.to_datetime(cleaned, errors="coerce")
+        except Exception:
+            return pd.NaT
+
+def cdss_get_json(endpoint, params=None):
+    params = dict(params or {})
+    params.setdefault("format", "json")
+    params.setdefault("pageSize", "500000")
+    headers = {}
+    api_key = get_cdss_api_key()
+    if api_key:
+        headers["ApiKey"] = api_key
+    url = f"{CDSS_BASE_URL}/{endpoint.lstrip('/')}"
+    r = requests.get(url, params=params, headers=headers, timeout=35)
+    r.raise_for_status()
+    data = r.json()
+    if isinstance(data, dict) and "ResultList" in data:
+        rows = data["ResultList"]
+    elif isinstance(data, list):
+        rows = data
+    else:
+        rows = []
+    return pd.DataFrame(rows), r.url
+
+@st.cache_data(ttl=60 * 20, show_spinner=False)
+def fetch_live_active_calls():
+    """
+    Pull active administrative calls from CDSS/DWR.
+    Filters to WD1, WD3, WD69 and excludes WDs 2,4,5,6,7,8,9.
+    """
+    df, url = cdss_get_json("administrativecalls/active", {"division": 1})
+    if df.empty:
+        return df, url, "No active calls returned from CDSS."
+
+    # Normalize camelCase API names to the historical column names used by the model.
+    rename = {
+        "dateTimeSet": "Date Time Set",
+        "dateTimeReleased": "Date Time Released",
+        "waterSourceName": "Water Source",
+        "locationWdid": "Location WDID",
+        "locationStructureName": "Location Structure Name",
+        "priorityWdid": "Call Priority WDID",
+        "priorityStructureName": "Priority Structure Name",
+        "priorityAdminNumber": "Priority Admin No",
+        "priorityDate": "Priority Date",
+        "priorityNumber": "Priority No",
+        "boundingWdid": "Bounding WDID",
+        "boundingStructureName": "Bounding Structure Name",
+        "setComments": "Set Comments",
+        "releaseComment": "Release Comments",
+        "modified": "Modified",
+        "moreInformation": "More_Information",
+    }
+    df = df.rename(columns={k: v for k, v in rename.items() if k in df.columns})
+
+    if "Location WDID" not in df.columns:
+        return pd.DataFrame(), url, "CDSS response did not include Location WDID."
+
+    df["Location WDID"] = pd.to_numeric(df["Location WDID"], errors="coerce")
+    df["wd"] = (df["Location WDID"] // 100000).astype("Int64")
+    df = df[df["wd"].isin(INCLUDED_WDS) & ~df["wd"].isin(EXCLUDED_WDS)].copy()
+    return df, url, "Live CDSS active calls loaded."
+
+def classify_regime_from_priority(set_dt, priority_dt):
+    if pd.isna(set_dt) or pd.isna(priority_dt):
+        return "Free River", 0, 0
+
+    py = int(pd.Timestamp(priority_dt).year)
+    july15 = pd.Timestamp(year=pd.Timestamp(set_dt).year, month=7, day=15)
+
+    if py >= 1871:
+        return "Mild Administration", 1, 25
+    if 1867 <= py <= 1870:
+        return "Normal Administration", 2, 50
+    if 1863 <= py <= 1866:
+        return "Senior Administration", 3, 75
+
+    # 1862 and earlier
+    if pd.Timestamp(set_dt).normalize() < july15:
+        return "Exceptional Administration", 4, 100
+    return "Senior Administration", 3, 75
+
+def build_live_current_state(live_calls):
+    """Return current basin state from the most severe included active call."""
+    if live_calls is None or live_calls.empty:
+        return {
+            "regime": "Free River",
+            "severity": 0,
+            "score": 0,
+            "historical_percentile": 0,
+            "controlling_wd": None,
+            "controlling_priority_date": "—",
+            "controlling_priority_structure": "—",
+            "controlling_water_source": "—",
+            "data_source": "Live CDSS active calls",
+        }
+
+    df = live_calls.copy()
+    df["set_dt"] = df.get("Date Time Set", pd.Series(index=df.index, dtype="object")).apply(parse_cdss_date)
+    df["priority_dt"] = df.get("Priority Date", pd.Series(index=df.index, dtype="object")).apply(parse_cdss_date)
+
+    classified = df.apply(
+        lambda r: classify_regime_from_priority(r["set_dt"], r["priority_dt"]),
+        axis=1,
+        result_type="expand",
+    )
+    classified.columns = ["regime", "severity", "score"]
+    df = pd.concat([df, classified], axis=1)
+
+    # Most severe active call controls the basin index.
+    df["Priority Admin No"] = pd.to_numeric(df.get("Priority Admin No"), errors="coerce")
+    df = df.sort_values(["severity", "Priority Admin No"], ascending=[False, True])
+    top = df.iloc[0]
+
+    return {
+        "regime": top["regime"],
+        "severity": int(top["severity"]),
+        "score": int(top["score"]),
+        "historical_percentile": None,
+        "controlling_wd": int(top["wd"]) if pd.notna(top.get("wd")) else None,
+        "controlling_priority_date": str(top.get("Priority Date", "—")),
+        "controlling_priority_structure": str(top.get("Priority Structure Name", "—")),
+        "controlling_water_source": str(top.get("Water Source", "—")),
+        "data_source": "Live CDSS active calls",
+    }
+
+def build_forecast_from_state(model_df, clf, le, state, selected_date):
+    """Create a model feature row using historical analog features plus live regime state."""
+    # Use same day-of-year row from latest/selected date as feature template.
+    template = model_df[model_df["date"] == selected_date]
+    if template.empty:
+        template = model_df.iloc[[-1]]
+    else:
+        template = template.iloc[[-1]]
+    row = template.copy()
+    row.loc[row.index[0], "regime"] = state["regime"]
+    row.loc[row.index[0], "severity"] = state["severity"]
+    row.loc[row.index[0], "score"] = state["score"]
+    row.loc[row.index[0], "historical_percentile"] = (model_df["score"].dropna() <= state["score"]).mean() * 100
+    X = row[FEATURES].fillna(model_df[FEATURES].median(numeric_only=True))
+    prob = clf.predict_proba(X)[0]
+    raw = pd.Series(prob, index=le.inverse_transform(np.arange(len(prob)))).reindex(REGIME_ORDER, fill_value=0)
+    adjusted = apply_expert_probability_overlay(raw, state["regime"], selected_date).sort_values(ascending=False)
+    return row, raw, adjusted
+
 
 st.markdown("""
 <style>
@@ -973,6 +1157,9 @@ default_date = min(latest_available, pd.Timestamp("2026-04-28"))
 
 
 if page == "Public Landing Page":
+    live_mode = st.sidebar.toggle("Use live CDSS active calls", value=True)
+    live_status_message = "Historical snapshot"
+
     landing_date = min(daily["date"].max(), pd.Timestamp("2026-04-28"))
     landing_row = model_df[model_df["date"] == landing_date]
     if landing_row.empty:
@@ -980,19 +1167,35 @@ if page == "Public Landing Page":
     else:
         landing_row = landing_row.iloc[[-1]]
 
-    landing_regime = landing_row.iloc[0]["regime"]
-    landing_pct = float(landing_row.iloc[0]["historical_percentile"])
-    landing_score = float(landing_row.iloc[0]["score"])
+    if live_mode:
+        try:
+            live_calls, live_url, live_status_message = fetch_live_active_calls()
+            current_state = build_live_current_state(live_calls)
+            landing_row, raw_land, adj_land = build_forecast_from_state(model_df, clf, le, current_state, landing_date)
+            landing_regime = current_state["regime"]
+            landing_pct = float((model_df["score"].dropna() <= current_state["score"]).mean() * 100)
+            landing_score = float(current_state["score"])
+            priority_display = current_state["controlling_priority_date"]
+            structure_display = current_state["controlling_priority_structure"]
+        except Exception as e:
+            live_mode = False
+            live_status_message = f"Live CDSS unavailable; using historical snapshot. Error: {e}"
+
+    if not live_mode:
+        landing_regime = landing_row.iloc[0]["regime"]
+        landing_pct = float(landing_row.iloc[0]["historical_percentile"])
+        landing_score = float(landing_row.iloc[0]["score"])
+        priority_display = landing_row.iloc[0].get("controlling_priority_date", "—")
+        structure_display = landing_row.iloc[0].get("controlling_priority_structure", "—")
+        X_land = landing_row[FEATURES].fillna(model_df[FEATURES].median(numeric_only=True))
+        land_prob = clf.predict_proba(X_land)[0]
+        raw_land = pd.Series(land_prob, index=le.inverse_transform(np.arange(len(land_prob)))).reindex(REGIME_ORDER, fill_value=0)
+        adj_land = apply_expert_probability_overlay(raw_land, landing_regime, landing_date).sort_values(ascending=False)
+
     landing_public = PUBLIC_LABELS[landing_regime]
     marker = max(0, min(100, landing_pct))
-
-    X_land = landing_row[FEATURES].fillna(model_df[FEATURES].median(numeric_only=True))
-    land_prob = clf.predict_proba(X_land)[0]
-    raw_land = pd.Series(land_prob, index=le.inverse_transform(np.arange(len(land_prob)))).reindex(REGIME_ORDER, fill_value=0)
-    adj_land = apply_expert_probability_overlay(raw_land, landing_regime, landing_date).sort_values(ascending=False)
     most_likely = adj_land.index[0]
     most_likely_public = PUBLIC_LABELS[most_likely]
-
     comps = comparable_years(model_df, landing_date, landing_score)
     comp_text = ", ".join(comps) if comps else "not enough history"
 
@@ -1027,19 +1230,21 @@ if page == "Public Landing Page":
             <span class="beta-pill">Current: {landing_public}</span>
             <span class="beta-pill">Similar years: {comp_text}</span>
             <span class="beta-pill">30-day: {most_likely_public}</span>
+            <span class="beta-pill">Source: {"Live CDSS" if live_mode else "Historical snapshot"}</span>
           </div>
         </div>
       </div>
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("""
+    st.markdown(f"""
     <div class="beta-section">
       <div class="beta-map-wrap">
         <div>
           <h2>Area covered by the Outlook</h2>
-          <p>The prototype focuses on the South Platte and Cache la Poudre systems most relevant to Northern Colorado. It translates historical administrative calls and streamflow into a public water-right pressure signal.</p>
+          <p>The prototype focuses on the South Platte and Cache la Poudre systems most relevant to Northern Colorado. It now reads live CDSS active calls when enabled and uses the historical record as the model backbone.</p>
           <div class="beta-meta"><span class="beta-pill">Cache la Poudre</span><span class="beta-pill">South Platte</span><span class="beta-pill">Fort Collins</span><span class="beta-pill">Greeley</span><span class="beta-pill">Northern Colorado</span></div>
+          <p style="margin-top:16px;color:#aebbc4;font-size:14px;">Current controlling signal: {priority_display} · {structure_display}</p>
         </div>
         <svg class="beta-map" viewBox="0 0 620 420" role="img" aria-label="Stylized Northern Colorado basin map">
           <rect x="0" y="0" width="620" height="420" rx="28" fill="rgba(255,255,255,.035)" stroke="rgba(255,255,255,.10)"/>
@@ -1058,12 +1263,13 @@ if page == "Public Landing Page":
       <h2>How it works</h2>
       <p>The Outlook turns technical water-right administration into a plain-English signal.</p>
       <div class="beta-flow">
-        <div class="beta-flow-step"><strong>Historical calls</strong><span>Administrative call records show how the river was actually administered.</span></div>
+        <div class="beta-flow-step"><strong>Live active calls</strong><span>CDSS active calls show today's administrative condition.</span></div>
         <div class="beta-flow-step"><strong>Daily regimes</strong><span>Each day is classified as available, mild, typical, senior, or exceptional.</span></div>
         <div class="beta-flow-step"><strong>Stress score</strong><span>Each day receives a 0–100 water-right pressure score.</span></div>
         <div class="beta-flow-step"><strong>Forecast model</strong><span>Historical patterns estimate the likely condition 30 days ahead.</span></div>
         <div class="beta-flow-step"><strong>Expert rules</strong><span>Water-right knowledge constrains the model to realistic outcomes.</span></div>
       </div>
+      <p style="margin-top:16px;color:#aebbc4;font-size:14px;">Status: {live_status_message}</p>
     </div>
     <div class="beta-section">
       <h2>Why water rights matter</h2>
@@ -1077,10 +1283,18 @@ if page == "Public Landing Page":
     </div>
     """, unsafe_allow_html=True)
 
+    with st.expander("Live CDSS diagnostics"):
+        st.write("Live mode:", live_mode)
+        st.write("Status:", live_status_message)
+        if live_mode:
+            st.write("URL:", live_url)
+            st.dataframe(live_calls.head(100), use_container_width=True)
+
     st.info("Use the sidebar to switch to the Outlook Dashboard.")
     st.stop()
 
 st.sidebar.title("Scenario")
+use_live_dashboard = st.sidebar.toggle("Use live CDSS active calls on dashboard", value=False)
 date_choice = st.sidebar.date_input(
     "Choose a historical date",
     value=default_date.date(),
@@ -1101,6 +1315,17 @@ raw_prob_series = pd.Series(prob, index=le.inverse_transform(np.arange(len(prob)
 
 current_regime = row.iloc[0]["regime"]
 prob_series = apply_expert_probability_overlay(raw_prob_series, current_regime, selected_date).sort_values(ascending=False)
+
+if use_live_dashboard:
+    try:
+        live_calls_dash, live_url_dash, live_msg_dash = fetch_live_active_calls()
+        live_state_dash = build_live_current_state(live_calls_dash)
+        row, raw_prob_series, prob_series = build_forecast_from_state(model_df, clf, le, live_state_dash, selected_date)
+        current_regime = live_state_dash["regime"]
+        row.loc[row.index[0], "controlling_priority_date"] = live_state_dash["controlling_priority_date"]
+        row.loc[row.index[0], "controlling_priority_structure"] = live_state_dash["controlling_priority_structure"]
+    except Exception as e:
+        st.sidebar.warning(f"Live CDSS unavailable; using historical selected date. {e}")
 
 hist_pct = float(row.iloc[0]["historical_percentile"])
 score = float(row.iloc[0]["score"])

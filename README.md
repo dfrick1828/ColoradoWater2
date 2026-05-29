@@ -1,5 +1,21 @@
-# Northern Colorado Water Right Outlook — Public Beta
+# Northern Colorado Water Right Outlook — Public Beta with CDSS API
 
-Public beta version with Poudre River landing page, current water-right pressure score, narrative forecast, comparable years, stylized basin map, how-it-works section, and why-water-rights-matter section.
+This version uses:
+- CDSS live active administrative calls when enabled
+- Historical daily regime data as the model backbone
+- Expert water-right rules
+- Public-facing Poudre River landing page
 
-Historical-data-only for reliable Streamlit deployment.
+## Optional API key
+
+CDSS supports anonymous use but applies call/row limits. For reliability, set a Streamlit secret:
+
+```toml
+CDSS_API_KEY = "your-key-here"
+```
+
+The app sends the key using the `ApiKey` request header.
+
+## Deploy
+
+Upload all files to GitHub and deploy on Streamlit Cloud with `app.py`.
