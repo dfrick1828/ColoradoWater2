@@ -234,102 +234,105 @@ st.markdown("""
   .meaning-grid { grid-template-columns: 1fr; }
 }
 
+
 .landing-hero {
-  min-height: 720px;
-  border: 1px solid rgba(255,255,255,.13);
-  border-radius: 38px;
-  padding: 52px;
+  min-height: 640px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 34px;
+  padding: 54px;
   background:
-    linear-gradient(90deg, rgba(3,10,15,.96), rgba(3,10,15,.72), rgba(3,10,15,.24)),
+    linear-gradient(90deg, rgba(3,10,15,.92), rgba(3,10,15,.62), rgba(3,10,15,.16)),
     var(--poudre-bg);
   background-size: cover;
   background-position: center;
-  box-shadow: 0 38px 120px rgba(0,0,0,.46);
+  box-shadow: 0 34px 100px rgba(0,0,0,.42);
   position: relative;
   overflow: hidden;
 }
 .landing-hero h1 {
-  font-size: 78px;
-  line-height: .90;
-  letter-spacing: -.075em;
+  font-size: 72px;
+  line-height: .92;
+  letter-spacing: -.07em;
   margin: 20px 0 18px;
-  max-width: 980px;
+  max-width: 900px;
   color: #f6fbfd;
 }
 .landing-hero p {
-  max-width: 780px;
-  font-size: 24px;
-  line-height: 1.42;
+  max-width: 650px;
+  font-size: 23px;
+  line-height: 1.38;
   color: #dfeaf0;
 }
 .landing-thesis {
   position: absolute;
-  left: 52px;
+  left: 54px;
   bottom: 48px;
-  max-width: 820px;
-  font-size: 31px;
+  max-width: 720px;
+  font-size: 28px;
   line-height: 1.18;
   letter-spacing: -.035em;
   font-weight: 850;
   color: #ffffff;
 }
 .landing-subline {
-  color: #9eb0bc;
+  color: #aebbc4;
   font-size: 14px;
-  margin-top: 16px;
+  margin-top: 14px;
   letter-spacing: .02em;
+  max-width: 700px;
 }
 .landing-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 18px;
   margin-top: 22px;
 }
 .landing-card {
   border: 1px solid rgba(255,255,255,.10);
-  border-radius: 26px;
-  background: linear-gradient(180deg, rgba(255,255,255,.070), rgba(255,255,255,.027));
-  padding: 24px;
-  min-height: 185px;
-  box-shadow: 0 18px 55px rgba(0,0,0,.24);
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(255,255,255,.060), rgba(255,255,255,.025));
+  padding: 22px;
+  min-height: 160px;
+  box-shadow: 0 18px 55px rgba(0,0,0,.22);
 }
 .landing-number {
-  font-size: 13px;
+  font-size: 12px;
   color: #5ec9df;
   font-weight: 900;
   letter-spacing: .16em;
   text-transform: uppercase;
 }
 .landing-card h3 {
-  font-size: 26px;
-  line-height: 1.05;
-  letter-spacing: -.04em;
-  margin: 12px 0 10px;
+  font-size: 23px;
+  line-height: 1.08;
+  letter-spacing: -.035em;
+  margin: 11px 0 9px;
   color: #f3f7f9;
 }
 .landing-card p {
   color: #cbd8de;
-  line-height: 1.55;
-  font-size: 15.5px;
+  line-height: 1.5;
+  font-size: 15px;
 }
 .callout {
   margin-top: 22px;
-  border: 1px solid rgba(94,201,223,.25);
-  border-radius: 28px;
-  padding: 30px;
-  background: linear-gradient(135deg, rgba(94,201,223,.11), rgba(124,76,194,.08));
+  border: 1px solid rgba(94,201,223,.22);
+  border-radius: 24px;
+  padding: 26px;
+  background: linear-gradient(135deg, rgba(94,201,223,.09), rgba(124,76,194,.06));
 }
 .callout h2 {
-  font-size: 36px;
-  letter-spacing: -.05em;
+  font-size: 32px;
+  letter-spacing: -.045em;
   margin: 0 0 10px;
 }
 .callout p {
   color: #d6e4ea;
-  font-size: 18px;
-  line-height: 1.55;
-  max-width: 980px;
+  font-size: 17px;
+  line-height: 1.5;
+  max-width: 960px;
 }
+
 @media (max-width: 900px) {
   .landing-hero { min-height: 620px; padding: 32px; }
   .landing-hero h1 { font-size: 48px; }
@@ -447,14 +450,12 @@ if page == "Landing Page":
     st.markdown(f"""
     <div class="landing-hero" style="--poudre-bg: {bg};">
       <div class="eyebrow">Northern Colorado Water Right Outlook</div>
-      <h1>Making Colorado's most important natural resource understandable.</h1>
-      <p>Colorado has become exceptionally good at measuring water. Snowpack. Streamflow. Reservoir storage. Drought indices. Yet the question most people actually care about remains unanswered: <strong>What does it mean for water rights?</strong></p>
+      <h1>Water forecasts exist.<br>Water-right forecasts don't.</h1>
+      <p>A public-facing prototype for understanding how Northern Colorado rivers are being administered — and what may be coming next.</p>
       <div class="landing-thesis">
-        We have weather forecasts.<br>
-        We have wildfire forecasts.<br>
-        We have drought forecasts.<br><br>
-        <strong>Why don't we have water-right forecasts?</strong>
-        <div class="landing-subline">South Platte / Cache la Poudre historical prototype · Built from administrative call records, flow data, and expert regime rules.</div>
+        Most water sites tell you how much water is in the river.
+        <br>This one explains what it means for water rights.
+        <div class="landing-subline">South Platte / Cache la Poudre historical prototype · Administrative calls · Flow data · Expert regime rules</div>
       </div>
     </div>
     """, unsafe_allow_html=True)
@@ -463,48 +464,32 @@ if page == "Landing Page":
     <div class="landing-grid">
       <div class="landing-card">
         <div class="landing-number">01</div>
-        <h3>Translate the system</h3>
-        <p>Water-right administration is usually hidden in call records, priority dates, and professional judgment. The Outlook turns that into plain-English conditions.</p>
+        <h3>Plain English</h3>
+        <p>Translates water-right administration into understandable conditions: available, tightening, typical, senior, or exceptional.</p>
       </div>
       <div class="landing-card">
         <div class="landing-number">02</div>
-        <h3>Compare today to history</h3>
-        <p>Every day is placed in historical context so the public can see whether conditions are routine, unusual, or severe compared with the record since 2005.</p>
+        <h3>Historical Context</h3>
+        <p>Shows whether today's conditions are routine, unusual, or severe compared with the daily record since 2005.</p>
       </div>
       <div class="landing-card">
         <div class="landing-number">03</div>
-        <h3>Look ahead</h3>
-        <p>The prototype estimates the likely administrative condition 30 days ahead, with expert rules layered over the statistical model.</p>
+        <h3>30-Day Outlook</h3>
+        <p>Uses historical patterns and expert rules to estimate the likely administrative condition in the weeks ahead.</p>
       </div>
     </div>
 
     <div class="callout">
-      <h2>Most water platforms answer: "How much water is there?"</h2>
+      <h2>A weather forecast for water rights.</h2>
       <p>
-      This platform answers: <strong>"What does that mean?"</strong>
-      <br><br>
-      Colorado has thousands of water-right owners and millions of water users. Yet most people have no way to understand what water-right administration means for the rivers, farms, cities, golf courses, reservoirs, and communities they depend on.
-      <br><br>
-      The next generation of water management is not better measurement. It is translating complexity into understanding.
-      </p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    
-    st.markdown("""
-    <div class="callout">
-      <h2>A Weather Forecast for Water Rights</h2>
-      <p>
-      Not a legal opinion.<br>
-      Not a replacement for the State Engineer.<br><br>
-      A new way to understand how Colorado's rivers are likely to be administered in the weeks ahead.
+      Not a legal opinion. Not a replacement for the State Engineer.
+      A clearer way for the public to understand what river conditions mean for water rights, farms, cities, reservoirs, and communities.
       </p>
     </div>
     """, unsafe_allow_html=True)
 
     st.info("Use the sidebar to switch to the Outlook Dashboard.")
     st.stop()
-
 
 st.sidebar.title("Scenario")
 date_choice = st.sidebar.date_input(
