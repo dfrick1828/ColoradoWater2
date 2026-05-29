@@ -843,6 +843,35 @@ st.markdown("""
   .rights-section, .rights-cta { padding:26px; }
 }
 
+
+.beta-hero{min-height:84vh;border-radius:36px;padding:48px;background:linear-gradient(90deg,rgba(3,10,15,.95),rgba(3,10,15,.66),rgba(3,10,15,.18)),var(--poudre-bg);background-size:cover;background-position:center;border:1px solid rgba(255,255,255,.12);box-shadow:0 38px 120px rgba(0,0,0,.48);position:relative;overflow:hidden}
+.beta-brand{color:#5ec9df;font-size:12px;letter-spacing:.18em;text-transform:uppercase;font-weight:950}
+.beta-title{max-width:980px;margin:18px 0 12px;color:#f8fcff;font-weight:950;font-size:clamp(44px,5.8vw,76px);line-height:.92;letter-spacing:-.075em}
+.beta-subtitle{max-width:720px;color:#dfeaf0;font-size:22px;line-height:1.36}
+.beta-status{position:absolute;left:48px;right:48px;bottom:42px;display:grid;grid-template-columns:1.05fr .95fr;gap:22px;align-items:stretch}
+.beta-panel{border:1px solid rgba(255,255,255,.15);border-radius:28px;padding:24px;background:rgba(4,12,18,.72);backdrop-filter:blur(14px)}
+.beta-panel-label{color:#aebbc4;font-size:12px;letter-spacing:.15em;text-transform:uppercase;font-weight:900}
+.beta-score{font-size:76px;line-height:.88;letter-spacing:-.07em;font-weight:950;color:white;margin:10px 0 12px}
+.beta-track{height:16px;border-radius:999px;background:linear-gradient(90deg,#5ec9df,#f1d36b,#f2a34a,#e45f56,#7c4cc2);position:relative;margin:14px 0 8px}
+.beta-marker{position:absolute;top:-8px;height:32px;width:4px;border-radius:999px;background:white;box-shadow:0 0 0 5px rgba(255,255,255,.17),0 10px 22px rgba(0,0,0,.42)}
+.beta-scale{display:flex;justify-content:space-between;color:#aebbc4;font-size:12px}
+.beta-narrative{color:#e3edf2;font-size:20px;line-height:1.42;letter-spacing:-.02em;font-weight:650}
+.beta-meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.beta-pill{display:inline-block;padding:8px 11px;border-radius:999px;border:1px solid rgba(255,255,255,.13);background:rgba(255,255,255,.08);color:#e7f0f4;font-size:13px;font-weight:800}
+.beta-section{margin-top:28px;padding:36px;border-radius:30px;border:1px solid rgba(255,255,255,.10);background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.024));box-shadow:0 24px 70px rgba(0,0,0,.24)}
+.beta-section h2{margin:0 0 12px;color:#f6fbfd;font-size:38px;line-height:1;letter-spacing:-.055em}
+.beta-section p{color:#d5e1e7;font-size:17px;line-height:1.55;max-width:980px}
+.beta-map-wrap{display:grid;grid-template-columns:.9fr 1.1fr;gap:24px;align-items:center}
+.beta-map{width:100%;max-width:540px;margin:auto;display:block}
+.beta-flow{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-top:24px}
+.beta-flow-step{border-radius:22px;padding:18px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.045);min-height:136px}
+.beta-flow-step strong{color:white;display:block;font-size:18px;line-height:1.08;letter-spacing:-.025em;margin-bottom:8px}
+.beta-flow-step span{color:#cbd8de;font-size:14px;line-height:1.38}
+.beta-grid-four{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:22px}
+.beta-impact{border:1px solid rgba(255,255,255,.10);border-radius:24px;padding:20px;background:rgba(255,255,255,.04);min-height:160px}
+.beta-impact .icon{font-size:30px;margin-bottom:10px}.beta-impact h3{margin:0 0 8px;color:white;font-size:22px;letter-spacing:-.035em}.beta-impact p{margin:0;color:#cbd8de;font-size:14.5px;line-height:1.45}
+@media(max-width:900px){.beta-hero{min-height:920px;padding:30px}.beta-status{position:static;margin-top:70px;grid-template-columns:1fr}.beta-score{font-size:58px}.beta-map-wrap,.beta-flow,.beta-grid-four{grid-template-columns:1fr}.beta-section{padding:26px}}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -953,7 +982,25 @@ if page == "Public Landing Page":
 
     landing_regime = landing_row.iloc[0]["regime"]
     landing_pct = float(landing_row.iloc[0]["historical_percentile"])
+    landing_score = float(landing_row.iloc[0]["score"])
     landing_public = PUBLIC_LABELS[landing_regime]
+    marker = max(0, min(100, landing_pct))
+
+    X_land = landing_row[FEATURES].fillna(model_df[FEATURES].median(numeric_only=True))
+    land_prob = clf.predict_proba(X_land)[0]
+    raw_land = pd.Series(land_prob, index=le.inverse_transform(np.arange(len(land_prob)))).reindex(REGIME_ORDER, fill_value=0)
+    adj_land = apply_expert_probability_overlay(raw_land, landing_regime, landing_date).sort_values(ascending=False)
+    most_likely = adj_land.index[0]
+    most_likely_public = PUBLIC_LABELS[most_likely]
+
+    comps = comparable_years(model_df, landing_date, landing_score)
+    comp_text = ", ".join(comps) if comps else "not enough history"
+
+    narrative = (
+        f"Northern Colorado water-right pressure is currently higher than {landing_pct:.0f}% "
+        f"of daily conditions since 2005. Conditions most closely resemble {comp_text}, "
+        f"with the 30-day outlook favoring {most_likely_public.lower()}."
+    )
 
     img64 = image_to_base64("assets/poudre_river_hero.jpg")
     if img64:
@@ -962,69 +1009,71 @@ if page == "Public Landing Page":
         bg = "url('https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1800&q=80')"
 
     st.markdown(f"""
-    <div class="rights-hero" style="--poudre-bg: {bg};">
-      <div class="story-eyebrow">Northern Colorado Water Right Outlook</div>
-      <div class="rights-title">Water rights affect everyone.</div>
-      <div class="rights-subtitle">Almost nobody understands them. This prototype translates Colorado water-right administration into a public outlook.</div>
-
-      <div class="rights-bottom">
-        <div class="rights-thesis">
-          Most water websites tell you how much water is in the river.<br>
-          This one tells you what that means for water rights.
+    <div class="beta-hero" style="--poudre-bg: {bg};">
+      <div class="beta-brand">Northern Colorado Water Right Outlook</div>
+      <div class="beta-title">A weather forecast for water rights.</div>
+      <div class="beta-subtitle">A public-facing way to understand whether Northern Colorado water-right conditions are normal, tightening, or historically severe.</div>
+      <div class="beta-status">
+        <div class="beta-panel">
+          <div class="beta-panel-label">Current water-right pressure</div>
+          <div class="beta-score">{landing_pct:.0f}<span style="font-size:32px;color:#aebbc4;"> / 100</span></div>
+          <div class="beta-track"><div class="beta-marker" style="left:calc({marker:.1f}% - 2px);"></div></div>
+          <div class="beta-scale"><span>Low</span><span>Typical</span><span>High</span></div>
         </div>
-        <div class="rights-mini-panel">
-          <div class="rights-mini-label">Current water-right pressure</div>
-          <div class="rights-mini-number">{landing_pct:.0f}<span style="font-size:26px;color:#aebbc4;"> / 100</span></div>
-          <div class="landing-subline">Current condition: {landing_public}<br>Higher than {landing_pct:.0f}% of daily conditions since 2005.</div>
+        <div class="beta-panel">
+          <div class="beta-panel-label">Today’s outlook</div>
+          <div class="beta-narrative">{narrative}</div>
+          <div class="beta-meta">
+            <span class="beta-pill">Current: {landing_public}</span>
+            <span class="beta-pill">Similar years: {comp_text}</span>
+            <span class="beta-pill">30-day: {most_likely_public}</span>
+          </div>
         </div>
       </div>
     </div>
     """, unsafe_allow_html=True)
 
     st.markdown("""
-    <div class="rights-section">
-      <h2>What are water rights?</h2>
-      <p>
-      In Colorado, water is not simply used by whoever is closest to the river. Water is administered through a priority system that determines who can divert, when they can divert, and what happens when supply gets tight.
-      </p>
-      <div class="rights-grid">
-        <div class="rights-card">
-          <div class="rights-icon">🚜</div>
-          <h3>Agriculture</h3>
-          <p>Farms and ditches depend on water rights to deliver irrigation water during the growing season.</p>
+    <div class="beta-section">
+      <div class="beta-map-wrap">
+        <div>
+          <h2>Area covered by the Outlook</h2>
+          <p>The prototype focuses on the South Platte and Cache la Poudre systems most relevant to Northern Colorado. It translates historical administrative calls and streamflow into a public water-right pressure signal.</p>
+          <div class="beta-meta"><span class="beta-pill">Cache la Poudre</span><span class="beta-pill">South Platte</span><span class="beta-pill">Fort Collins</span><span class="beta-pill">Greeley</span><span class="beta-pill">Northern Colorado</span></div>
         </div>
-        <div class="rights-card">
-          <div class="rights-icon">🏙️</div>
-          <h3>Cities</h3>
-          <p>Municipal water systems rely on water rights, storage, exchanges, and augmentation to serve homes and businesses.</p>
-        </div>
-        <div class="rights-card">
-          <div class="rights-icon">🏞️</div>
-          <h3>Rivers</h3>
-          <p>Water-right administration affects flows, timing, storage, diversions, and how rivers behave during dry periods.</p>
-        </div>
+        <svg class="beta-map" viewBox="0 0 620 420" role="img" aria-label="Stylized Northern Colorado basin map">
+          <rect x="0" y="0" width="620" height="420" rx="28" fill="rgba(255,255,255,.035)" stroke="rgba(255,255,255,.10)"/>
+          <path d="M65,115 C150,95 215,108 278,145 C340,180 390,184 455,165 C515,148 560,170 590,198" fill="none" stroke="#5ec9df" stroke-width="10" stroke-linecap="round"/>
+          <path d="M95,250 C175,210 235,218 300,250 C360,280 420,290 522,260" fill="none" stroke="#5ec9df" stroke-width="7" stroke-linecap="round" opacity=".78"/>
+          <path d="M138,82 L188,26 L245,90" fill="none" stroke="rgba(255,255,255,.30)" stroke-width="3"/>
+          <path d="M260,98 L318,30 L382,104" fill="none" stroke="rgba(255,255,255,.25)" stroke-width="3"/>
+          <circle cx="245" cy="178" r="9" fill="#f2a34a"/><text x="260" y="184" fill="#edf4f7" font-size="17" font-weight="700">Fort Collins</text>
+          <circle cx="468" cy="246" r="9" fill="#f2a34a"/><text x="482" y="252" fill="#edf4f7" font-size="17" font-weight="700">Greeley</text>
+          <circle cx="182" cy="226" r="7" fill="#7c4cc2"/><text x="196" y="232" fill="#edf4f7" font-size="15" font-weight="700">Horsetooth</text>
+          <text x="80" y="142" fill="#9eb0bc" font-size="15">Cache la Poudre</text><text x="345" y="303" fill="#9eb0bc" font-size="15">South Platte</text>
+        </svg>
       </div>
     </div>
-
-    <div class="rights-section">
-      <h2>Why do people talk about “calls”?</h2>
-      <p>
-      When water is limited, senior water rights can place a call that limits junior diversions. The result is not just a low river — it is an administrative condition.
-      </p>
-      <div class="call-timeline">
-        <div class="call-step"><strong>Free River</strong><span>No meaningful call pressure. Water is generally available.</span></div>
-        <div class="call-step"><strong>Administration</strong><span>Rights are being administered by priority.</span></div>
-        <div class="call-step"><strong>Senior Call</strong><span>Older rights control the river and junior rights face pressure.</span></div>
-        <div class="call-step"><strong>Exceptional Stress</strong><span>Historically severe administration for the time of year.</span></div>
+    <div class="beta-section">
+      <h2>How it works</h2>
+      <p>The Outlook turns technical water-right administration into a plain-English signal.</p>
+      <div class="beta-flow">
+        <div class="beta-flow-step"><strong>Historical calls</strong><span>Administrative call records show how the river was actually administered.</span></div>
+        <div class="beta-flow-step"><strong>Daily regimes</strong><span>Each day is classified as available, mild, typical, senior, or exceptional.</span></div>
+        <div class="beta-flow-step"><strong>Stress score</strong><span>Each day receives a 0–100 water-right pressure score.</span></div>
+        <div class="beta-flow-step"><strong>Forecast model</strong><span>Historical patterns estimate the likely condition 30 days ahead.</span></div>
+        <div class="beta-flow-step"><strong>Expert rules</strong><span>Water-right knowledge constrains the model to realistic outcomes.</span></div>
       </div>
     </div>
-
-    <div class="rights-cta">
-      <h2>A weather forecast for water rights.</h2>
-      <p>
-      Colorado forecasts weather. Colorado forecasts drought. Colorado forecasts streamflow.
-      This project asks a different question: why not forecast water-right administration?
-      </p>
+    <div class="beta-section">
+      <h2>Why water rights matter</h2>
+      <p>Water rights are not an abstract legal concept. They shape how water moves through Northern Colorado.</p>
+      <div class="beta-grid-four">
+        <div class="beta-impact"><div class="icon">🚜</div><h3>Agriculture</h3><p>Ditches and farms depend on priority administration during the growing season.</p></div>
+        <div class="beta-impact"><div class="icon">🏙️</div><h3>Cities</h3><p>Municipal supply depends on rights, storage, exchanges, and timing.</p></div>
+        <div class="beta-impact"><div class="icon">🏞️</div><h3>Rivers</h3><p>Administration affects flows, diversions, storage, and dry-year conditions.</p></div>
+        <div class="beta-impact"><div class="icon">🏌️</div><h3>Communities</h3><p>Boards, residents, and local decision makers need understandable water signals.</p></div>
+      </div>
     </div>
     """, unsafe_allow_html=True)
 

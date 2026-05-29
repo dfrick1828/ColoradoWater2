@@ -1,12 +1,5 @@
-# Northern Colorado Water Right Outlook — Public-Facing Prototype
+# Northern Colorado Water Right Outlook — Public Beta
 
-This version adds a cinematic Poudre River landing page plus the historical outlook dashboard.
+Public beta version with Poudre River landing page, current water-right pressure score, narrative forecast, comparable years, stylized basin map, how-it-works section, and why-water-rights-matter section.
 
-It uses historical data only, avoids live CDSS API calls, and presents water-right administration in plain English.
-
-## Deploy
-
-Upload all files to GitHub and deploy on Streamlit Cloud with:
-
-- Main file: `app.py`
-- Requirements: `requirements.txt`
+Historical-data-only for reliable Streamlit deployment.
