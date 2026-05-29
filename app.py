@@ -502,7 +502,7 @@ if page == "Landing Page":
     </div>
     """, unsafe_allow_html=True)
 
-st.info("Use the sidebar to switch to the Outlook Dashboard.")
+    st.info("Use the sidebar to switch to the Outlook Dashboard.")
     st.stop()
 
 
