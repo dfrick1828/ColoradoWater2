@@ -54,27 +54,10 @@ The public-facing current call is selected as the active Cache la Poudre call:
 This is intended to show the current Poudre call, such as the 11/20/1874 call, rather than the most senior call elsewhere in WD1/WD3.
 
 
-## Latest dashboard change
+## Stochastic hydrology rebuild
 
-Removed the "Administrative stress around selected date" chart and replaced it with a 30-day probability outlook chart showing the likelihood of each water-right regime.
-
-
-## Latest change
-
-Public-facing historical charts now start at 2025.
-
-
-## Latest change
-
-Annual regime history chart restored to 2005–present.
-
-
-## Stochastic hydrology layer
-
-Added:
-- Daily flow autocorrelation diagnostics
-- Flow-to-call-depth cross-correlation diagnostics
+This build adds a visible stochastic hydrology section:
+- Autocorrelation diagnostics for Poudre canyon-mouth flow
+- Cross-correlation diagnostics between flow and call-depth score
 - Seasonal AR(1) Monte Carlo hydrology simulation
-- 30/60/90-day stochastic water-right regime probabilities
-
-This is a prototype stochastic wrapper using canyon-mouth flow and the existing regime classifier.
+- 30/60/90-day stochastic regime probabilities

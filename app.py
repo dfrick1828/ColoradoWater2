@@ -1074,6 +1074,25 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+
+def same_day_call_depth_percentile(model_df, target_date, current_score, window_days=0):
+    target_date = pd.Timestamp(target_date)
+    doy = int(target_date.dayofyear)
+
+    if window_days == 0:
+        hist = model_df[model_df["doy"] == doy]["score"].dropna()
+        if len(hist) < 8:
+            window_days = 7
+
+    if window_days > 0:
+        low = max(1, doy - window_days)
+        high = min(366, doy + window_days)
+        hist = model_df[model_df["doy"].between(low, high)]["score"].dropna()
+
+    if len(hist) == 0:
+        return 0.0
+    return float((hist <= current_score).mean() * 100)
+
 def apply_expert_probability_overlay(prob_series, current_regime, selected_date):
     adjusted = prob_series.copy().astype(float)
     month = int(pd.Timestamp(selected_date).month)
@@ -1125,18 +1144,24 @@ def prepare_model_dataset(daily, flow):
 
 def build_stochastic_hydrology_model(model_df):
     """
-    Build a lightweight stochastic hydrology model using:
-    - autoregressive persistence in flow and severity
-    - lagged hydrology / administration cross-correlations
-    - Monte Carlo simulation of 30/60/90-day flow paths
-    This is intentionally simple and explainable for prototype use.
+    Build a simple stochastic hydrology layer:
+    - flow autocorrelation diagnostics
+    - flow/call-depth cross-correlation diagnostics
+    - seasonal AR(1) residual model for flow simulation
     """
     df = model_df.sort_values("date").copy()
-    df["log_flow"] = np.log1p(df["flow_cfs"].clip(lower=0))
-    df["log_flow_delta"] = df["log_flow"].diff()
-    df["score_delta"] = df["score"].diff()
 
-    # Autocorrelations for flow persistence.
+    # Defensive feature checks.
+    if "flow_cfs" not in df.columns:
+        df["flow_cfs"] = 0.0
+    if "doy" not in df.columns:
+        df["doy"] = df["date"].dt.dayofyear
+    if "score" not in df.columns:
+        df["score"] = 0.0
+
+    df["flow_cfs"] = pd.to_numeric(df["flow_cfs"], errors="coerce").interpolate(limit_direction="both").fillna(0)
+    df["log_flow"] = np.log1p(df["flow_cfs"].clip(lower=0))
+
     autocorr = []
     for lag in [1, 3, 7, 14, 30]:
         autocorr.append({
@@ -1145,30 +1170,30 @@ def build_stochastic_hydrology_model(model_df):
             "Autocorrelation": df["log_flow"].autocorr(lag=lag)
         })
 
-    # Cross-correlations: flow leading severity by lag.
     crosscorr = []
     for lag in [0, 3, 7, 14, 30, 45, 60]:
-        shifted_flow = df["log_flow"].shift(lag)
-        corr = shifted_flow.corr(df["score"])
         crosscorr.append({
             "Signal": "Flow leading call-depth score",
             "Lead/Lag Days": lag,
-            "Correlation": corr
+            "Correlation": df["log_flow"].shift(lag).corr(pd.to_numeric(df["score"], errors="coerce"))
         })
 
-    # Estimate AR(1)-style process for log-flow deviations by day-of-year.
-    df["seasonal_flow_mean"] = df.groupby("doy")["log_flow"].transform("mean")
-    df["flow_anom"] = df["log_flow"] - df["seasonal_flow_mean"]
-    ar_df = df.dropna(subset=["flow_anom"]).copy()
-    x = ar_df["flow_anom"].shift(1)
-    y = ar_df["flow_anom"]
-    valid = pd.concat([x, y], axis=1).dropna()
-    if len(valid) > 10 and valid.iloc[:, 0].var() > 0:
-        phi = float(np.cov(valid.iloc[:, 0], valid.iloc[:, 1])[0, 1] / np.var(valid.iloc[:, 0]))
+    seasonal = df.groupby("doy")["log_flow"].mean().to_dict()
+    df["seasonal_log_flow"] = df["doy"].map(seasonal)
+    df["flow_anom"] = df["log_flow"] - df["seasonal_log_flow"]
+
+    valid = pd.DataFrame({
+        "lag": df["flow_anom"].shift(1),
+        "now": df["flow_anom"]
+    }).dropna()
+
+    if len(valid) > 10 and valid["lag"].var() > 0:
+        phi = float(np.cov(valid["lag"], valid["now"])[0, 1] / np.var(valid["lag"]))
     else:
         phi = 0.85
     phi = max(min(phi, 0.98), -0.2)
-    resid = (valid.iloc[:, 1] - phi * valid.iloc[:, 0]).dropna()
+
+    resid = valid["now"] - phi * valid["lag"] if len(valid) else pd.Series(dtype=float)
     sigma = float(resid.std()) if len(resid) else 0.15
     if not np.isfinite(sigma) or sigma <= 0:
         sigma = 0.15
@@ -1178,18 +1203,15 @@ def build_stochastic_hydrology_model(model_df):
         "crosscorr": pd.DataFrame(crosscorr),
         "phi": phi,
         "sigma": sigma,
-        "seasonal_log_flow": df.groupby("doy")["log_flow"].mean().to_dict(),
+        "seasonal_log_flow": seasonal,
     }
 
 
-def simulate_stochastic_outlook(model_df, clf, le, base_row, n_sims=1000, horizons=(30, 60, 90), seed=42):
+def simulate_stochastic_outlook(model_df, clf, le, base_row, n_sims=500, horizons=(30, 60, 90), seed=42):
     """
     Monte Carlo hydrology/regime forecast.
-
-    Simulates future flow using a seasonal AR(1) anomaly model, then sends the
-    simulated hydrology state through the existing regime classifier.
-
-    Note: this is a prototype stochastic wrapper, not a final hydrologic model.
+    Simulates seasonal AR(1) flow paths and sends simulated feature states
+    through the existing water-right regime classifier.
     """
     rng = np.random.default_rng(seed)
     hydro = build_stochastic_hydrology_model(model_df)
@@ -1198,25 +1220,35 @@ def simulate_stochastic_outlook(model_df, clf, le, base_row, n_sims=1000, horizo
     seasonal = hydro["seasonal_log_flow"]
 
     base = base_row.iloc[0].copy()
-    base_date = pd.Timestamp(base["date"])
-    base_log_flow = np.log1p(max(float(base.get("flow_cfs", 0)), 0))
+    base_date = pd.Timestamp(base.get("date", pd.Timestamp.today())).normalize()
+    base_flow = float(base.get("flow_cfs", model_df["flow_cfs"].median() if "flow_cfs" in model_df.columns else 0) or 0)
+    base_log_flow = np.log1p(max(base_flow, 0))
     base_doy = int(base.get("doy", base_date.dayofyear))
     base_seasonal = seasonal.get(base_doy, base_log_flow)
-    base_anom = base_log_flow - base_seasonal
+    anom0 = base_log_flow - base_seasonal
 
+    feature_medians = model_df[FEATURES].median(numeric_only=True)
     outputs = []
-    sim_paths = []
+    paths = []
 
-    for i in range(n_sims):
-        anom = base_anom
-        path_records = []
+    for sim in range(n_sims):
+        anom = anom0
+        recent_flows = []
         for day in range(1, max(horizons) + 1):
             future_date = base_date + pd.Timedelta(days=day)
             future_doy = int(future_date.dayofyear)
             season_mean = seasonal.get(future_doy, base_seasonal)
             anom = phi * anom + rng.normal(0, sigma)
-            sim_log_flow = season_mean + anom
-            sim_flow = max(np.expm1(sim_log_flow), 0)
+            sim_flow = max(np.expm1(season_mean + anom), 0)
+            recent_flows.append(sim_flow)
+
+            if sim < 60:
+                paths.append({
+                    "simulation": sim,
+                    "day": day,
+                    "date": future_date,
+                    "simulated_flow_cfs": sim_flow
+                })
 
             if day in horizons:
                 row = base_row.copy()
@@ -1226,33 +1258,25 @@ def simulate_stochastic_outlook(model_df, clf, le, base_row, n_sims=1000, horizo
                 row.loc[idx, "month"] = future_date.month
                 row.loc[idx, "doy"] = future_doy
                 row.loc[idx, "flow_cfs"] = sim_flow
-                row.loc[idx, "flow_7d"] = sim_flow
-                row.loc[idx, "flow_14d"] = sim_flow
-                row.loc[idx, "flow_30d"] = sim_flow
-                row.loc[idx, "flow_change_7d"] = sim_flow - float(base.get("flow_cfs", sim_flow))
-                row.loc[idx, "flow_change_14d"] = sim_flow - float(base.get("flow_cfs", sim_flow))
+                row.loc[idx, "flow_7d"] = np.mean(recent_flows[-7:])
+                row.loc[idx, "flow_14d"] = np.mean(recent_flows[-14:])
+                row.loc[idx, "flow_30d"] = np.mean(recent_flows[-30:])
+                row.loc[idx, "flow_change_7d"] = sim_flow - base_flow
+                row.loc[idx, "flow_change_14d"] = sim_flow - base_flow
                 row.loc[idx, "sin_doy"] = np.sin(2 * np.pi * future_doy / 366)
                 row.loc[idx, "cos_doy"] = np.cos(2 * np.pi * future_doy / 366)
 
-                X = row[FEATURES].fillna(model_df[FEATURES].median(numeric_only=True))
+                X = row[FEATURES].fillna(feature_medians)
                 prob = clf.predict_proba(X)[0]
                 classes = le.inverse_transform(np.arange(len(prob)))
-                pred_regime = classes[np.argmax(prob)]
+                pred = classes[np.argmax(prob)]
+
                 outputs.append({
-                    "simulation": i,
+                    "simulation": sim,
                     "horizon_days": day,
-                    "predicted_regime": pred_regime,
+                    "predicted_regime": pred,
                     "simulated_flow_cfs": sim_flow,
                 })
-
-            if i < 60:
-                path_records.append({
-                    "simulation": i,
-                    "day": day,
-                    "date": future_date,
-                    "simulated_flow_cfs": sim_flow
-                })
-        sim_paths.extend(path_records)
 
     out = pd.DataFrame(outputs)
     probs = (
@@ -1261,7 +1285,7 @@ def simulate_stochastic_outlook(model_df, clf, le, base_row, n_sims=1000, horizo
         .div(out.groupby("horizon_days").size(), level=0)
         .reset_index(name="probability")
     )
-    return probs, pd.DataFrame(sim_paths), hydro
+    return probs, pd.DataFrame(paths), hydro
 
 
 FEATURES = [
@@ -1380,7 +1404,7 @@ if page == "Public Landing Page":
     <div class="beta-hero" style="--poudre-bg: {bg};">
       <div class="beta-brand">Water Right Outlook</div>
       <div class="beta-title">Understanding water-right administration today and what may happen next.</div>
-      <div class="beta-subtitle">A public outlook for water-right administration based on historical calls, current conditions, and forecasted administrative regimes.</div>
+      <div class="beta-subtitle">A public-facing way to understand whether Northern Colorado water-right conditions are normal, tightening, or historically severe.</div>
       <div class="beta-status">
         <div class="beta-panel">
           <div class="beta-panel-label">Current water-right pressure</div>
@@ -1389,7 +1413,7 @@ if page == "Public Landing Page":
           <div class="beta-scale"><span>Low</span><span>Typical</span><span>High</span></div>
         </div>
         <div class="beta-panel">
-          <div class="beta-panel-label">Water Right Outlook</div>
+          <div class="beta-panel-label">Today’s outlook</div>
           <div class="beta-narrative">{narrative}</div>
           <div class="beta-meta">
             <span class="beta-pill">Current: {landing_public}</span>
@@ -1591,105 +1615,54 @@ with m4:
     st.markdown('<div class="copy">Higher means more restrictive water-right administration.</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
-
-st.markdown("### 30-Day Water Rights Outlook")
-
-outlook_df = (
-    prob_series
-    .reindex(REGIME_ORDER)
-    .reset_index()
-    .rename(columns={"index": "Regime", 0: "Probability"})
+st.markdown("### Administrative stress around selected date")
+window = model_df[(model_df["date"] >= selected_date - pd.Timedelta(days=90)) & (model_df["date"] <= selected_date + pd.Timedelta(days=90))]
+fig = go.Figure()
+fig.add_trace(go.Scatter(
+    x=window["date"], y=window["score"], mode="lines",
+    line=dict(color="#5ec9df", width=3),
+    fill="tozeroy", fillcolor="rgba(94,201,223,.12)",
+    hovertemplate="%{x|%b %d, %Y}<br>Severity: %{y}<extra></extra>",
+))
+fig.add_vline(x=selected_date, line_width=2, line_dash="dash", line_color="#ffffff")
+fig.update_layout(
+    height=340,
+    margin=dict(l=10, r=10, t=20, b=10),
+    yaxis=dict(title="Administrative severity", range=[0, 105], gridcolor="rgba(255,255,255,.10)"),
+    xaxis=dict(gridcolor="rgba(255,255,255,.06)"),
+    paper_bgcolor="rgba(0,0,0,0)",
+    plot_bgcolor="rgba(0,0,0,0)",
+    font=dict(color="#edf4f7"),
 )
-outlook_df["Public Label"] = outlook_df["Regime"].map(PUBLIC_LABELS)
-outlook_df["Short Label"] = outlook_df["Regime"].map(PUBLIC_SHORT)
-outlook_df["Percent"] = outlook_df["Probability"] * 100
-
-top_regime = prob_series.idxmax()
-top_prob = prob_series.max()
-
-c_out1, c_out2 = st.columns([0.72, 0.28], gap="large")
-
-with c_out1:
-    fig = go.Figure()
-    for regime in REGIME_ORDER:
-        row_prob = float(outlook_df.loc[outlook_df["Regime"] == regime, "Probability"].iloc[0])
-        fig.add_trace(go.Bar(
-            x=[row_prob],
-            y=[PUBLIC_SHORT[regime]],
-            orientation="h",
-            marker_color=REGIME_COLORS[regime],
-            text=[f"{row_prob:.0%}"],
-            textposition="outside",
-            hovertemplate=f"{PUBLIC_LABELS[regime]}<br>%{{x:.0%}}<extra></extra>",
-            showlegend=False,
-        ))
-
-    fig.update_layout(
-        height=420,
-        margin=dict(l=10, r=40, t=10, b=10),
-        xaxis=dict(
-            range=[0, 1],
-            tickformat=".0%",
-            title="Probability",
-            gridcolor="rgba(255,255,255,.10)"
-        ),
-        yaxis=dict(
-            title="",
-            categoryorder="array",
-            categoryarray=[PUBLIC_SHORT[r] for r in reversed(REGIME_ORDER)]
-        ),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="#edf4f7", size=14),
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
-with c_out2:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="kicker">Most likely outcome</div>', unsafe_allow_html=True)
-    st.markdown(
-        f'<div class="big" style="color:{REGIME_COLORS[top_regime]};">{PUBLIC_LABELS[top_regime]}</div>',
-        unsafe_allow_html=True
-    )
-    st.markdown(
-        f'<div class="copy">{top_prob:.0%} probability over the next 30 days.</div>',
-        unsafe_allow_html=True
-    )
-    st.markdown(
-        '<div class="note">This forecast combines the historical regime model with expert rules for realistic water-right outcomes.</div>',
-        unsafe_allow_html=True
-    )
-    st.markdown('</div>', unsafe_allow_html=True)
-
+st.plotly_chart(fig, use_container_width=True)
 
 
 st.markdown("### Stochastic hydrology outlook")
 
-stoch_row = row.copy()
-stoch_probs, stoch_paths, hydro_model = simulate_stochastic_outlook(
-    model_df,
-    clf,
-    le,
-    stoch_row,
-    n_sims=750,
-    horizons=(30, 60, 90),
-    seed=42,
-)
-
-stoch_display = stoch_probs.copy()
-stoch_display["Public Label"] = stoch_display["predicted_regime"].map(PUBLIC_SHORT)
-stoch_display["Horizon"] = stoch_display["horizon_days"].astype(str) + " days"
+with st.spinner("Running stochastic hydrology simulation..."):
+    stoch_probs, stoch_paths, hydro_model = simulate_stochastic_outlook(
+        model_df,
+        clf,
+        le,
+        row.copy(),
+        n_sims=500,
+        horizons=(30, 60, 90),
+        seed=42,
+    )
 
 c_stoch1, c_stoch2 = st.columns([0.68, 0.32], gap="large")
 
 with c_stoch1:
     fig = go.Figure()
     for regime in REGIME_ORDER:
-        sub = stoch_display[stoch_display["predicted_regime"] == regime]
         y_vals = []
         for h in [30, 60, 90]:
-            match = sub[sub["horizon_days"] == h]
+            match = stoch_probs[
+                (stoch_probs["horizon_days"] == h) &
+                (stoch_probs["predicted_regime"] == regime)
+            ]
             y_vals.append(float(match["probability"].iloc[0]) if not match.empty else 0.0)
+
         fig.add_trace(go.Bar(
             x=["30 days", "60 days", "90 days"],
             y=y_vals,
@@ -1719,7 +1692,10 @@ with c_stoch2:
         '<div class="copy">Estimated daily flow persistence from the historical record. Higher values mean current hydrologic conditions tend to carry forward.</div>',
         unsafe_allow_html=True
     )
-    st.markdown('<div class="note">Prototype stochastic layer: seasonal AR(1) flow simulation + existing water-right regime classifier.</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="note">Prototype stochastic layer: seasonal AR(1) flow simulation plus existing water-right regime classifier.</div>',
+        unsafe_allow_html=True
+    )
     st.markdown('</div>', unsafe_allow_html=True)
 
 with st.expander("Hydrology autocorrelation and cross-correlation diagnostics"):
