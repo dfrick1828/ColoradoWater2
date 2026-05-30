@@ -57,3 +57,8 @@ This is intended to show the current Poudre call, such as the 11/20/1874 call, r
 ## Latest dashboard change
 
 Removed the "Administrative stress around selected date" chart and replaced it with a 30-day probability outlook chart showing the likelihood of each water-right regime.
+
+
+## Latest change
+
+Public-facing historical charts now start at 2025.

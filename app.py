@@ -1520,9 +1520,9 @@ with c_out2:
     st.markdown('</div>', unsafe_allow_html=True)
 
 
-st.markdown("### Annual regime history")
+st.markdown("### Annual regime history since 2025")
 annual = annual.rename(columns={annual.columns[0]: "year"}) if annual.columns[0] != "year" else annual
-plot_annual = annual[annual["year"] >= 2010].copy()
+plot_annual = annual[annual["year"] >= 2025].copy()
 fig = go.Figure()
 for regime in REGIME_ORDER:
     if regime in plot_annual.columns:
