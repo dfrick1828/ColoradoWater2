@@ -67,3 +67,14 @@ Public-facing historical charts now start at 2025.
 ## Latest change
 
 Annual regime history chart restored to 2005–present.
+
+
+## Stochastic hydrology layer
+
+Added:
+- Daily flow autocorrelation diagnostics
+- Flow-to-call-depth cross-correlation diagnostics
+- Seasonal AR(1) Monte Carlo hydrology simulation
+- 30/60/90-day stochastic water-right regime probabilities
+
+This is a prototype stochastic wrapper using canyon-mouth flow and the existing regime classifier.
