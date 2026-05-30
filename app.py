@@ -18,7 +18,7 @@ def image_to_base64(path):
     return base64.b64encode(p.read_bytes()).decode("utf-8")
 
 st.set_page_config(
-    page_title="Northern Colorado Water Right Outlook",
+    page_title="Water Right Outlook",
     page_icon="💧",
     layout="wide",
 )
@@ -1236,9 +1236,9 @@ if page == "Public Landing Page":
 
     st.markdown(f"""
     <div class="beta-hero" style="--poudre-bg: {bg};">
-      <div class="beta-brand">Northern Colorado Water Right Outlook</div>
-      <div class="beta-title">A weather forecast for water rights.</div>
-      <div class="beta-subtitle">A public-facing way to understand whether Northern Colorado water-right conditions are normal, tightening, or historically severe.</div>
+      <div class="beta-brand">Water Right Outlook</div>
+      <div class="beta-title">Understanding water-right administration today and what may happen next.</div>
+      <div class="beta-subtitle">A public outlook for water-right administration based on historical calls, current conditions, and forecasted administrative regimes.</div>
       <div class="beta-status">
         <div class="beta-panel">
           <div class="beta-panel-label">Current water-right pressure</div>
@@ -1247,7 +1247,7 @@ if page == "Public Landing Page":
           <div class="beta-scale"><span>Low</span><span>Typical</span><span>High</span></div>
         </div>
         <div class="beta-panel">
-          <div class="beta-panel-label">Today’s outlook</div>
+          <div class="beta-panel-label">Water Right Outlook</div>
           <div class="beta-narrative">{narrative}</div>
           <div class="beta-meta">
             <span class="beta-pill">Current: {landing_public}</span>
@@ -1341,7 +1341,7 @@ most_likely_public = PUBLIC_LABELS[most_likely]
 st.markdown(f"""
 <div class="hero">
   <div class="eyebrow">Historical-data prototype</div>
-  <h1>Northern Colorado Water Right Outlook</h1>
+  <h1>Water Right Outlook</h1>
   <p>Making Colorado water rights understandable — by translating river administration into a plain-English outlook.</p>
   <div class="hero-footer">
     <div class="small-muted">Selected date: {selected_date.strftime("%B %d, %Y")} · South Platte / Poudre framework</div>
@@ -1415,7 +1415,7 @@ with right:
     st.markdown('<div class="section-title">What does this mean?</div>', unsafe_allow_html=True)
     st.markdown(f"""
     <div class="meaning-grid" style="grid-template-columns:1fr;">
-      <div class="meaning-card"><strong>For the public</strong><br><span class="copy">This is like a weather forecast for water rights: not just how much water is in the river, but how the river is being administered.</span></div>
+      <div class="meaning-card"><strong>For the public</strong><br><span class="copy">This is like a water-right outlook: not just how much water is in the river, but how the river is being administered.</span></div>
       <div class="meaning-card"><strong>For water-right owners</strong><br><span class="copy">The outlook gives a plain-English signal of whether administrative pressure is likely to ease, hold, or tighten.</span></div>
       <div class="meaning-card"><strong>For Northern Colorado</strong><br><span class="copy">The key issue is not only drought. It is whether priority administration becomes more restrictive.</span></div>
     </div>
@@ -1449,26 +1449,76 @@ with m4:
     st.markdown('<div class="copy">Higher means more restrictive water-right administration.</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
-st.markdown("### Administrative stress around selected date")
-window = model_df[(model_df["date"] >= selected_date - pd.Timedelta(days=90)) & (model_df["date"] <= selected_date + pd.Timedelta(days=90))]
-fig = go.Figure()
-fig.add_trace(go.Scatter(
-    x=window["date"], y=window["score"], mode="lines",
-    line=dict(color="#5ec9df", width=3),
-    fill="tozeroy", fillcolor="rgba(94,201,223,.12)",
-    hovertemplate="%{x|%b %d, %Y}<br>Severity: %{y}<extra></extra>",
-))
-fig.add_vline(x=selected_date, line_width=2, line_dash="dash", line_color="#ffffff")
-fig.update_layout(
-    height=340,
-    margin=dict(l=10, r=10, t=20, b=10),
-    yaxis=dict(title="Administrative severity", range=[0, 105], gridcolor="rgba(255,255,255,.10)"),
-    xaxis=dict(gridcolor="rgba(255,255,255,.06)"),
-    paper_bgcolor="rgba(0,0,0,0)",
-    plot_bgcolor="rgba(0,0,0,0)",
-    font=dict(color="#edf4f7"),
+
+st.markdown("### 30-Day Water Rights Outlook")
+
+outlook_df = (
+    prob_series
+    .reindex(REGIME_ORDER)
+    .reset_index()
+    .rename(columns={"index": "Regime", 0: "Probability"})
 )
-st.plotly_chart(fig, use_container_width=True)
+outlook_df["Public Label"] = outlook_df["Regime"].map(PUBLIC_LABELS)
+outlook_df["Short Label"] = outlook_df["Regime"].map(PUBLIC_SHORT)
+outlook_df["Percent"] = outlook_df["Probability"] * 100
+
+top_regime = prob_series.idxmax()
+top_prob = prob_series.max()
+
+c_out1, c_out2 = st.columns([0.72, 0.28], gap="large")
+
+with c_out1:
+    fig = go.Figure()
+    for regime in REGIME_ORDER:
+        row_prob = float(outlook_df.loc[outlook_df["Regime"] == regime, "Probability"].iloc[0])
+        fig.add_trace(go.Bar(
+            x=[row_prob],
+            y=[PUBLIC_SHORT[regime]],
+            orientation="h",
+            marker_color=REGIME_COLORS[regime],
+            text=[f"{row_prob:.0%}"],
+            textposition="outside",
+            hovertemplate=f"{PUBLIC_LABELS[regime]}<br>%{{x:.0%}}<extra></extra>",
+            showlegend=False,
+        ))
+
+    fig.update_layout(
+        height=420,
+        margin=dict(l=10, r=40, t=10, b=10),
+        xaxis=dict(
+            range=[0, 1],
+            tickformat=".0%",
+            title="Probability",
+            gridcolor="rgba(255,255,255,.10)"
+        ),
+        yaxis=dict(
+            title="",
+            categoryorder="array",
+            categoryarray=[PUBLIC_SHORT[r] for r in reversed(REGIME_ORDER)]
+        ),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(color="#edf4f7", size=14),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+with c_out2:
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<div class="kicker">Most likely outcome</div>', unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="big" style="color:{REGIME_COLORS[top_regime]};">{PUBLIC_LABELS[top_regime]}</div>',
+        unsafe_allow_html=True
+    )
+    st.markdown(
+        f'<div class="copy">{top_prob:.0%} probability over the next 30 days.</div>',
+        unsafe_allow_html=True
+    )
+    st.markdown(
+        '<div class="note">This forecast combines the historical regime model with expert rules for realistic water-right outcomes.</div>',
+        unsafe_allow_html=True
+    )
+    st.markdown('</div>', unsafe_allow_html=True)
+
 
 st.markdown("### Annual regime history")
 annual = annual.rename(columns={annual.columns[0]: "year"}) if annual.columns[0] != "year" else annual

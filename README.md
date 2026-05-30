@@ -52,3 +52,8 @@ The public-facing current call is selected as the active Cache la Poudre call:
 - select the most recently set active Poudre call, using Priority Admin No as a tie-breaker.
 
 This is intended to show the current Poudre call, such as the 11/20/1874 call, rather than the most senior call elsewhere in WD1/WD3.
+
+
+## Latest dashboard change
+
+Removed the "Administrative stress around selected date" chart and replaced it with a 30-day probability outlook chart showing the likelihood of each water-right regime.
