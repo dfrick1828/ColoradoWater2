@@ -1153,6 +1153,17 @@ today_date = pd.Timestamp.today().normalize()
 default_date = today_date
 
 
+
+def get_model_row_for_date(model_df, selected_date):
+    selected_date = pd.Timestamp(selected_date).normalize()
+    exact = model_df[model_df["date"] == selected_date]
+    if not exact.empty:
+        return exact.iloc[-1:]
+    same_doy = model_df[model_df["doy"] == selected_date.dayofyear]
+    if not same_doy.empty:
+        return same_doy.sort_values("date").iloc[[-1]]
+    return model_df.sort_values("date").iloc[[-1]]
+
 if page == "Public Landing Page":
     live_mode = st.sidebar.toggle("Use live CDSS active calls", value=True)
     live_status_message = "Historical snapshot"
