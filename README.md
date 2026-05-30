@@ -62,3 +62,8 @@ Removed the "Administrative stress around selected date" chart and replaced it w
 ## Latest change
 
 Public-facing historical charts now start at 2025.
+
+
+## Latest change
+
+Annual regime history chart restored to 2005–present.
