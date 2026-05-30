@@ -228,11 +228,7 @@ def build_live_current_state(live_calls):
 def build_forecast_from_state(model_df, clf, le, state, selected_date):
     """Create a model feature row using historical analog features plus live regime state."""
     # Use same day-of-year row from latest/selected date as feature template.
-    template = model_df[model_df["date"] == selected_date]
-    if template.empty:
-        template = model_df.iloc[[-1]]
-    else:
-        template = template.iloc[[-1]]
+    template = get_model_row_for_date(model_df, selected_date)
     row = template.copy()
     row.loc[row.index[0], "regime"] = state["regime"]
     row.loc[row.index[0], "severity"] = state["severity"]
@@ -1153,19 +1149,16 @@ page = st.sidebar.radio(
 )
 
 latest_available = daily["date"].max()
-default_date = min(latest_available, pd.Timestamp("2026-04-28"))
+today_date = pd.Timestamp.today().normalize()
+default_date = today_date
 
 
 if page == "Public Landing Page":
     live_mode = st.sidebar.toggle("Use live CDSS active calls", value=True)
     live_status_message = "Historical snapshot"
 
-    landing_date = min(daily["date"].max(), pd.Timestamp("2026-04-28"))
-    landing_row = model_df[model_df["date"] == landing_date]
-    if landing_row.empty:
-        landing_row = model_df.iloc[[-1]]
-    else:
-        landing_row = landing_row.iloc[[-1]]
+    landing_date = pd.Timestamp.today().normalize()
+    landing_row = get_model_row_for_date(model_df, landing_date)
 
     if live_mode:
         try:
@@ -1239,27 +1232,6 @@ if page == "Public Landing Page":
 
     st.markdown(f"""
     <div class="beta-section">
-      <div class="beta-map-wrap">
-        <div>
-          <h2>Area covered by the Outlook</h2>
-          <p>The prototype focuses on the South Platte and Cache la Poudre systems most relevant to Northern Colorado. It now reads live CDSS active calls when enabled and uses the historical record as the model backbone.</p>
-          <div class="beta-meta"><span class="beta-pill">Cache la Poudre</span><span class="beta-pill">South Platte</span><span class="beta-pill">Fort Collins</span><span class="beta-pill">Greeley</span><span class="beta-pill">Northern Colorado</span></div>
-          <p style="margin-top:16px;color:#aebbc4;font-size:14px;">Current controlling signal: {priority_display} · {structure_display}</p>
-        </div>
-        <svg class="beta-map" viewBox="0 0 620 420" role="img" aria-label="Stylized Northern Colorado basin map">
-          <rect x="0" y="0" width="620" height="420" rx="28" fill="rgba(255,255,255,.035)" stroke="rgba(255,255,255,.10)"/>
-          <path d="M65,115 C150,95 215,108 278,145 C340,180 390,184 455,165 C515,148 560,170 590,198" fill="none" stroke="#5ec9df" stroke-width="10" stroke-linecap="round"/>
-          <path d="M95,250 C175,210 235,218 300,250 C360,280 420,290 522,260" fill="none" stroke="#5ec9df" stroke-width="7" stroke-linecap="round" opacity=".78"/>
-          <path d="M138,82 L188,26 L245,90" fill="none" stroke="rgba(255,255,255,.30)" stroke-width="3"/>
-          <path d="M260,98 L318,30 L382,104" fill="none" stroke="rgba(255,255,255,.25)" stroke-width="3"/>
-          <circle cx="245" cy="178" r="9" fill="#f2a34a"/><text x="260" y="184" fill="#edf4f7" font-size="17" font-weight="700">Fort Collins</text>
-          <circle cx="468" cy="246" r="9" fill="#f2a34a"/><text x="482" y="252" fill="#edf4f7" font-size="17" font-weight="700">Greeley</text>
-          <circle cx="182" cy="226" r="7" fill="#7c4cc2"/><text x="196" y="232" fill="#edf4f7" font-size="15" font-weight="700">Horsetooth</text>
-          <text x="80" y="142" fill="#9eb0bc" font-size="15">Cache la Poudre</text><text x="345" y="303" fill="#9eb0bc" font-size="15">South Platte</text>
-        </svg>
-      </div>
-    </div>
-    <div class="beta-section">
       <h2>How it works</h2>
       <p>The Outlook turns technical water-right administration into a plain-English signal.</p>
       <div class="beta-flow">
@@ -1299,15 +1271,11 @@ date_choice = st.sidebar.date_input(
     "Choose a historical date",
     value=default_date.date(),
     min_value=daily["date"].min().date(),
-    max_value=latest_available.date(),
+    max_value=max(latest_available, today_date).date(),
 )
 selected_date = pd.Timestamp(date_choice)
 
-row = model_df[model_df["date"] == selected_date]
-if row.empty:
-    st.error("No model data for that date. Try another date.")
-    st.stop()
-row = row.iloc[-1:]
+row = get_model_row_for_date(model_df, selected_date)
 
 X = row[FEATURES].fillna(model_df[FEATURES].median(numeric_only=True))
 prob = clf.predict_proba(X)[0]
@@ -1515,3 +1483,22 @@ Free River, Mild Administration, Normal Administration, Senior Administration, a
     st.dataframe(row, use_container_width=True)
 
 st.markdown('<div class="note">Not an official forecast, legal opinion, or substitute for CDSS/DWR records. Built as a public-education prototype.</div>', unsafe_allow_html=True)
+def get_model_row_for_date(model_df, selected_date):
+    """
+    Return an exact model row if available. If the user selects today's date
+    and the historical snapshot is not updated through today, use the closest
+    available date with the same day-of-year; otherwise fall back to latest row.
+    """
+    selected_date = pd.Timestamp(selected_date)
+    exact = model_df[model_df["date"] == selected_date]
+    if not exact.empty:
+        return exact.iloc[-1:]
+
+    same_doy = model_df[model_df["doy"] == selected_date.dayofyear]
+    if not same_doy.empty:
+        # Prefer the most recent historical year with the same day of year.
+        return same_doy.sort_values("date").iloc[[-1]]
+
+    return model_df.iloc[[-1]]
+
+

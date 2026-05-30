@@ -29,3 +29,10 @@ The live current-call display now uses the most recently set active call from th
 ## Same-day call-depth percentile
 
 The landing-page "Today's condition" metric now compares the current call-depth/severity score against historical observations for the same day of year, rather than against all days in the record. If exact day-of-year history is sparse, the app falls back to a +/- 7 day seasonal window.
+
+
+## Latest patch
+
+- The default scenario/historical date now opens on the current calendar day.
+- If the historical snapshot does not contain today's exact date, the app uses the most recent historical row with the same day-of-year as a model template.
+- Removed the "Area covered by the Outlook" section from the landing page.
