@@ -36,3 +36,9 @@ The landing-page "Today's condition" metric now compares the current call-depth/
 - The default scenario/historical date now opens on the current calendar day.
 - If the historical snapshot does not contain today's exact date, the app uses the most recent historical row with the same day-of-year as a model template.
 - Removed the "Area covered by the Outlook" section from the landing page.
+
+
+## Current call selection rule
+
+The reported/current call is selected as the most senior active call in WD1 and WD3.
+Selection uses lowest CDSS Priority Admin No, with Priority Date as a fallback.
