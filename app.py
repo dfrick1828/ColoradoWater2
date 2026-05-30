@@ -182,7 +182,7 @@ def classify_regime_from_priority(set_dt, priority_dt):
     return "Senior Administration", 3, 75
 
 def build_live_current_state(live_calls):
-    """Return current basin state from the most severe included active call."""
+    """Return current basin state from the active Cache la Poudre call display rule."""
     if live_calls is None or live_calls.empty:
         return {
             "regime": "Free River",
@@ -208,10 +208,29 @@ def build_live_current_state(live_calls):
     classified.columns = ["regime", "severity", "score"]
     df = pd.concat([df, classified], axis=1)
 
-    # Most severe active call controls the basin index.
+    # Public-facing current call: active Cache la Poudre call.
+    # Do not report the most senior call basin-wide. For the public display,
+    # report the current Poudre call record from WD3, preferring rows whose
+    # water source or structure fields contain "POUDRE", then selecting the
+    # most recently set active call.
     df["Priority Admin No"] = pd.to_numeric(df.get("Priority Admin No"), errors="coerce")
-    df = df.sort_values(["severity", "Priority Admin No"], ascending=[False, True])
-    top = df.iloc[0]
+
+    search_cols = [c for c in ["Water Source", "Location Structure Name", "Priority Structure Name"] if c in df.columns]
+    if search_cols:
+        poudre_mask = False
+        for col in search_cols:
+            poudre_mask = poudre_mask | df[col].astype(str).str.upper().str.contains("POUDRE", na=False)
+    else:
+        poudre_mask = False
+
+    report_df = df[(df["wd"] == 3) & poudre_mask].copy()
+    if report_df.empty:
+        report_df = df[df["wd"] == 3].copy()
+    if report_df.empty:
+        report_df = df.copy()
+
+    report_df = report_df.sort_values(["set_dt", "Priority Admin No"], ascending=[False, True], na_position="last")
+    top = report_df.iloc[0]
 
     return {
         "regime": top["regime"],

@@ -42,3 +42,13 @@ The landing-page "Today's condition" metric now compares the current call-depth/
 
 The reported/current call is selected as the most senior active call in WD1 and WD3.
 Selection uses lowest CDSS Priority Admin No, with Priority Date as a fallback.
+
+
+## Current Poudre call selection rule
+
+The public-facing current call is selected as the active Cache la Poudre call:
+- WD3 records;
+- prefer Water Source / Location Structure / Priority Structure fields containing "POUDRE";
+- select the most recently set active Poudre call, using Priority Admin No as a tie-breaker.
+
+This is intended to show the current Poudre call, such as the 11/20/1874 call, rather than the most senior call elsewhere in WD1/WD3.
