@@ -54,15 +54,21 @@ The public-facing current call is selected as the active Cache la Poudre call:
 This is intended to show the current Poudre call, such as the 11/20/1874 call, rather than the most senior call elsewhere in WD1/WD3.
 
 
-## Stochastic hydrology rebuild
+## Latest dashboard change
 
-This build adds a visible stochastic hydrology section:
-- Autocorrelation diagnostics for Poudre canyon-mouth flow
-- Cross-correlation diagnostics between flow and call-depth score
-- Seasonal AR(1) Monte Carlo hydrology simulation
-- 30/60/90-day stochastic regime probabilities
+Removed the "Administrative stress around selected date" chart and replaced it with a 30-day probability outlook chart showing the likelihood of each water-right regime.
 
 
-## Fast stochastic patch
+## Latest change
 
-Reduced Monte Carlo paths to 150, batched classifier predictions, and removed the long spinner so Streamlit Cloud resolves quickly.
+Public-facing historical charts now start at 2025.
+
+
+## Latest change
+
+Annual regime history chart restored to 2005–present.
+
+
+## Clean stochastic rebuild
+
+Rebuilt from the stable pre-stochastic app. The stochastic UI is inserted only after `daily`, `annual`, `flow`, `model_df`, `clf`, `le`, and `row` exist.
