@@ -1142,6 +1142,7 @@ def prepare_model_dataset(daily, flow):
     return df
 
 
+@st.cache_data(show_spinner=False)
 def build_stochastic_hydrology_model(model_df):
     """
     Build a simple stochastic hydrology layer:
@@ -1207,11 +1208,13 @@ def build_stochastic_hydrology_model(model_df):
     }
 
 
-def simulate_stochastic_outlook(model_df, clf, le, base_row, n_sims=500, horizons=(30, 60, 90), seed=42):
+def simulate_stochastic_outlook(model_df, clf, le, base_row, n_sims=150, horizons=(30, 60, 90), seed=42):
     """
-    Monte Carlo hydrology/regime forecast.
-    Simulates seasonal AR(1) flow paths and sends simulated feature states
-    through the existing water-right regime classifier.
+    Fast Monte Carlo hydrology/regime forecast for Streamlit Cloud.
+
+    This version simulates seasonal AR(1) flow paths, summarizes flow at
+    each horizon, and batches classifier predictions by horizon instead of
+    predicting one path at a time.
     """
     rng = np.random.default_rng(seed)
     hydro = build_stochastic_hydrology_model(model_df)
@@ -1225,58 +1228,55 @@ def simulate_stochastic_outlook(model_df, clf, le, base_row, n_sims=500, horizon
     base_log_flow = np.log1p(max(base_flow, 0))
     base_doy = int(base.get("doy", base_date.dayofyear))
     base_seasonal = seasonal.get(base_doy, base_log_flow)
-    anom0 = base_log_flow - base_seasonal
+    anom = np.full(n_sims, base_log_flow - base_seasonal, dtype=float)
+
+    max_h = max(horizons)
+    sim_flows = np.zeros((n_sims, max_h), dtype=float)
+
+    for day in range(1, max_h + 1):
+        future_date = base_date + pd.Timedelta(days=day)
+        future_doy = int(future_date.dayofyear)
+        season_mean = seasonal.get(future_doy, base_seasonal)
+        anom = phi * anom + rng.normal(0, sigma, size=n_sims)
+        sim_flows[:, day - 1] = np.maximum(np.expm1(season_mean + anom), 0)
 
     feature_medians = model_df[FEATURES].median(numeric_only=True)
     outputs = []
-    paths = []
 
-    for sim in range(n_sims):
-        anom = anom0
-        recent_flows = []
-        for day in range(1, max(horizons) + 1):
-            future_date = base_date + pd.Timedelta(days=day)
-            future_doy = int(future_date.dayofyear)
-            season_mean = seasonal.get(future_doy, base_seasonal)
-            anom = phi * anom + rng.normal(0, sigma)
-            sim_flow = max(np.expm1(season_mean + anom), 0)
-            recent_flows.append(sim_flow)
+    for h in horizons:
+        future_date = base_date + pd.Timedelta(days=h)
+        future_doy = int(future_date.dayofyear)
+        rows = []
 
-            if sim < 60:
-                paths.append({
-                    "simulation": sim,
-                    "day": day,
-                    "date": future_date,
-                    "simulated_flow_cfs": sim_flow
-                })
+        for i in range(n_sims):
+            row = base.copy()
+            sim_flow = float(sim_flows[i, h - 1])
+            recent = sim_flows[i, :h]
 
-            if day in horizons:
-                row = base_row.copy()
-                idx = row.index[0]
-                row.loc[idx, "date"] = future_date
-                row.loc[idx, "year"] = future_date.year
-                row.loc[idx, "month"] = future_date.month
-                row.loc[idx, "doy"] = future_doy
-                row.loc[idx, "flow_cfs"] = sim_flow
-                row.loc[idx, "flow_7d"] = np.mean(recent_flows[-7:])
-                row.loc[idx, "flow_14d"] = np.mean(recent_flows[-14:])
-                row.loc[idx, "flow_30d"] = np.mean(recent_flows[-30:])
-                row.loc[idx, "flow_change_7d"] = sim_flow - base_flow
-                row.loc[idx, "flow_change_14d"] = sim_flow - base_flow
-                row.loc[idx, "sin_doy"] = np.sin(2 * np.pi * future_doy / 366)
-                row.loc[idx, "cos_doy"] = np.cos(2 * np.pi * future_doy / 366)
+            row["date"] = future_date
+            row["year"] = future_date.year
+            row["month"] = future_date.month
+            row["doy"] = future_doy
+            row["flow_cfs"] = sim_flow
+            row["flow_7d"] = float(np.mean(recent[-7:]))
+            row["flow_14d"] = float(np.mean(recent[-14:]))
+            row["flow_30d"] = float(np.mean(recent[-30:]))
+            row["flow_change_7d"] = sim_flow - base_flow
+            row["flow_change_14d"] = sim_flow - base_flow
+            row["sin_doy"] = np.sin(2 * np.pi * future_doy / 366)
+            row["cos_doy"] = np.cos(2 * np.pi * future_doy / 366)
+            rows.append(row)
 
-                X = row[FEATURES].fillna(feature_medians)
-                prob = clf.predict_proba(X)[0]
-                classes = le.inverse_transform(np.arange(len(prob)))
-                pred = classes[np.argmax(prob)]
+        Xh = pd.DataFrame(rows)[FEATURES].fillna(feature_medians)
+        preds = clf.predict(Xh)
+        regimes = le.inverse_transform(preds)
 
-                outputs.append({
-                    "simulation": sim,
-                    "horizon_days": day,
-                    "predicted_regime": pred,
-                    "simulated_flow_cfs": sim_flow,
-                })
+        for regime, sim_flow in zip(regimes, sim_flows[:, h - 1]):
+            outputs.append({
+                "horizon_days": h,
+                "predicted_regime": regime,
+                "simulated_flow_cfs": float(sim_flow),
+            })
 
     out = pd.DataFrame(outputs)
     probs = (
@@ -1285,370 +1285,33 @@ def simulate_stochastic_outlook(model_df, clf, le, base_row, n_sims=500, horizon
         .div(out.groupby("horizon_days").size(), level=0)
         .reset_index(name="probability")
     )
-    return probs, pd.DataFrame(paths), hydro
 
+    # Keep only a small sample of paths for optional plotting/diagnostics.
+    path_records = []
+    for i in range(min(25, n_sims)):
+        for day in range(1, max_h + 1):
+            path_records.append({
+                "simulation": i,
+                "day": day,
+                "date": base_date + pd.Timedelta(days=day),
+                "simulated_flow_cfs": float(sim_flows[i, day - 1])
+            })
 
-FEATURES = [
-    "severity", "score", "historical_percentile", "month", "doy", "sin_doy", "cos_doy",
-    "flow_cfs", "flow_7d", "flow_14d", "flow_30d", "flow_change_7d", "flow_change_14d",
-    "flow_doy_percentile", "severity_change_7d", "severity_change_14d", "days_in_current_regime",
-]
-
-@st.cache_resource
-def train_model(model_df):
-    train_df = model_df.dropna(subset=FEATURES + ["target_regime_30d"]).copy()
-    le = LabelEncoder()
-    le.fit(REGIME_ORDER)
-    y = le.transform(train_df["target_regime_30d"])
-    clf = RandomForestClassifier(
-        n_estimators=500,
-        max_depth=8,
-        min_samples_leaf=10,
-        random_state=42,
-        class_weight="balanced_subsample",
-    )
-    clf.fit(train_df[FEATURES], y)
-    return clf, le
-
-def comparable_years(model_df, selected_date, score):
-    doy = int(selected_date.dayofyear)
-    y0 = int(selected_date.year)
-    comps = []
-    for y, g in model_df.groupby(model_df["date"].dt.year):
-        if y == y0:
-            continue
-        w = g[g["doy"].between(max(1, doy-30), doy)]
-        if len(w) > 10:
-            comps.append((y, abs(w["score"].mean() - score), w["score"].mean()))
-    comps = sorted(comps, key=lambda x: x[1])[:3]
-    return [str(x[0]) for x in comps]
-
-daily, annual, flow = load_data()
-model_df = prepare_model_dataset(daily, flow)
-clf, le = train_model(model_df)
-
-page = st.sidebar.radio(
-    "View",
-    ["Public Landing Page", "Outlook Dashboard"],
-    index=0,
-)
-
-latest_available = daily["date"].max()
-today_date = pd.Timestamp.today().normalize()
-default_date = today_date
-
-
-
-def get_model_row_for_date(model_df, selected_date):
-    selected_date = pd.Timestamp(selected_date).normalize()
-    exact = model_df[model_df["date"] == selected_date]
-    if not exact.empty:
-        return exact.iloc[-1:]
-    same_doy = model_df[model_df["doy"] == selected_date.dayofyear]
-    if not same_doy.empty:
-        return same_doy.sort_values("date").iloc[[-1]]
-    return model_df.sort_values("date").iloc[[-1]]
-
-if page == "Public Landing Page":
-    live_mode = st.sidebar.toggle("Use live CDSS active calls", value=True)
-    live_status_message = "Historical snapshot"
-
-    landing_date = pd.Timestamp.today().normalize()
-    landing_row = get_model_row_for_date(model_df, landing_date)
-
-    if live_mode:
-        try:
-            live_calls, live_url, live_status_message = fetch_live_active_calls()
-            current_state = build_live_current_state(live_calls)
-            landing_row, raw_land, adj_land = build_forecast_from_state(model_df, clf, le, current_state, landing_date)
-            landing_regime = current_state["regime"]
-            landing_pct = float((model_df["score"].dropna() <= current_state["score"]).mean() * 100)
-            landing_score = float(current_state["score"])
-            priority_display = current_state["controlling_priority_date"]
-            structure_display = current_state["controlling_priority_structure"]
-        except Exception as e:
-            live_mode = False
-            live_status_message = f"Live CDSS unavailable; using historical snapshot. Error: {e}"
-
-    if not live_mode:
-        landing_regime = landing_row.iloc[0]["regime"]
-        landing_pct = float(landing_row.iloc[0]["historical_percentile"])
-        landing_score = float(landing_row.iloc[0]["score"])
-        priority_display = landing_row.iloc[0].get("controlling_priority_date", "—")
-        structure_display = landing_row.iloc[0].get("controlling_priority_structure", "—")
-        X_land = landing_row[FEATURES].fillna(model_df[FEATURES].median(numeric_only=True))
-        land_prob = clf.predict_proba(X_land)[0]
-        raw_land = pd.Series(land_prob, index=le.inverse_transform(np.arange(len(land_prob)))).reindex(REGIME_ORDER, fill_value=0)
-        adj_land = apply_expert_probability_overlay(raw_land, landing_regime, landing_date).sort_values(ascending=False)
-
-    landing_public = PUBLIC_LABELS[landing_regime]
-    marker = max(0, min(100, landing_pct))
-    most_likely = adj_land.index[0]
-    most_likely_public = PUBLIC_LABELS[most_likely]
-    comps = comparable_years(model_df, landing_date, landing_score)
-    comp_text = ", ".join(comps) if comps else "not enough history"
-
-    narrative = (
-        f"Northern Colorado water-right pressure is currently higher than {landing_pct:.0f}% "
-        f"of daily conditions since 2005. Conditions most closely resemble {comp_text}, "
-        f"with the 30-day outlook favoring {most_likely_public.lower()}."
-    )
-
-    img64 = image_to_base64("assets/poudre_river_hero.jpg")
-    if img64:
-        bg = f"url('data:image/jpeg;base64,{img64}')"
-    else:
-        bg = "url('https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1800&q=80')"
-
-    st.markdown(f"""
-    <div class="beta-hero" style="--poudre-bg: {bg};">
-      <div class="beta-brand">Water Right Outlook</div>
-      <div class="beta-title">Understanding water-right administration today and what may happen next.</div>
-      <div class="beta-subtitle">A public-facing way to understand whether Northern Colorado water-right conditions are normal, tightening, or historically severe.</div>
-      <div class="beta-status">
-        <div class="beta-panel">
-          <div class="beta-panel-label">Current water-right pressure</div>
-          <div class="beta-score">{landing_pct:.0f}<span style="font-size:32px;color:#aebbc4;"> / 100</span></div>
-          <div class="beta-track"><div class="beta-marker" style="left:calc({marker:.1f}% - 2px);"></div></div>
-          <div class="beta-scale"><span>Low</span><span>Typical</span><span>High</span></div>
-        </div>
-        <div class="beta-panel">
-          <div class="beta-panel-label">Today’s outlook</div>
-          <div class="beta-narrative">{narrative}</div>
-          <div class="beta-meta">
-            <span class="beta-pill">Current: {landing_public}</span>
-            <span class="beta-pill">Similar years: {comp_text}</span>
-            <span class="beta-pill">30-day: {most_likely_public}</span>
-            <span class="beta-pill">Source: {"Live CDSS" if live_mode else "Historical snapshot"}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown(f"""
-    <div class="beta-section">
-      <h2>How it works</h2>
-      <p>The Outlook turns technical water-right administration into a plain-English signal.</p>
-      <div class="beta-flow">
-        <div class="beta-flow-step"><strong>Live active calls</strong><span>CDSS active calls show today's administrative condition.</span></div>
-        <div class="beta-flow-step"><strong>Daily regimes</strong><span>Each day is classified as available, mild, typical, senior, or exceptional.</span></div>
-        <div class="beta-flow-step"><strong>Stress score</strong><span>Each day receives a 0–100 water-right pressure score.</span></div>
-        <div class="beta-flow-step"><strong>Forecast model</strong><span>Historical patterns estimate the likely condition 30 days ahead.</span></div>
-        <div class="beta-flow-step"><strong>Expert rules</strong><span>Water-right knowledge constrains the model to realistic outcomes.</span></div>
-      </div>
-      <p style="margin-top:16px;color:#aebbc4;font-size:14px;">Status: {live_status_message}</p>
-    </div>
-    <div class="beta-section">
-      <h2>Why water rights matter</h2>
-      <p>Water rights are not an abstract legal concept. They shape how water moves through Northern Colorado.</p>
-      <div class="beta-grid-four">
-        <div class="beta-impact"><div class="icon">🚜</div><h3>Agriculture</h3><p>Ditches and farms depend on priority administration during the growing season.</p></div>
-        <div class="beta-impact"><div class="icon">🏙️</div><h3>Cities</h3><p>Municipal supply depends on rights, storage, exchanges, and timing.</p></div>
-        <div class="beta-impact"><div class="icon">🏞️</div><h3>Rivers</h3><p>Administration affects flows, diversions, storage, and dry-year conditions.</p></div>
-        <div class="beta-impact"><div class="icon">🏌️</div><h3>Communities</h3><p>Boards, residents, and local decision makers need understandable water signals.</p></div>
-      </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    with st.expander("Live CDSS diagnostics"):
-        st.write("Live mode:", live_mode)
-        st.write("Status:", live_status_message)
-        if live_mode:
-            st.write("URL:", live_url)
-            st.dataframe(live_calls.head(100), use_container_width=True)
-
-    st.info("Use the sidebar to switch to the Outlook Dashboard.")
-    st.stop()
-
-st.sidebar.title("Scenario")
-use_live_dashboard = st.sidebar.toggle("Use live CDSS active calls on dashboard", value=False)
-date_choice = st.sidebar.date_input(
-    "Choose a historical date",
-    value=default_date.date(),
-    min_value=daily["date"].min().date(),
-    max_value=max(latest_available, today_date).date(),
-)
-selected_date = pd.Timestamp(date_choice)
-
-row = get_model_row_for_date(model_df, selected_date)
-
-X = row[FEATURES].fillna(model_df[FEATURES].median(numeric_only=True))
-prob = clf.predict_proba(X)[0]
-raw_prob_series = pd.Series(prob, index=le.inverse_transform(np.arange(len(prob)))).reindex(REGIME_ORDER, fill_value=0)
-
-current_regime = row.iloc[0]["regime"]
-prob_series = apply_expert_probability_overlay(raw_prob_series, current_regime, selected_date).sort_values(ascending=False)
-
-if use_live_dashboard:
-    try:
-        live_calls_dash, live_url_dash, live_msg_dash = fetch_live_active_calls()
-        live_state_dash = build_live_current_state(live_calls_dash)
-        row, raw_prob_series, prob_series = build_forecast_from_state(model_df, clf, le, live_state_dash, selected_date)
-        current_regime = live_state_dash["regime"]
-        row.loc[row.index[0], "controlling_priority_date"] = live_state_dash["controlling_priority_date"]
-        row.loc[row.index[0], "controlling_priority_structure"] = live_state_dash["controlling_priority_structure"]
-    except Exception as e:
-        st.sidebar.warning(f"Live CDSS unavailable; using historical selected date. {e}")
-
-hist_pct = float(row.iloc[0]["historical_percentile"])
-score = float(row.iloc[0]["score"])
-priority = row.iloc[0].get("controlling_priority_date", "—")
-structure = row.iloc[0].get("controlling_priority_structure", "—")
-flow_cfs = float(row.iloc[0].get("flow_cfs", np.nan))
-flow_pct = float(row.iloc[0].get("flow_doy_percentile", np.nan))
-comps = comparable_years(model_df, selected_date, score)
-
-public_label = PUBLIC_LABELS[current_regime]
-public_explain = PUBLIC_EXPLAIN[current_regime]
-most_likely = prob_series.index[0]
-most_likely_public = PUBLIC_LABELS[most_likely]
-
-st.markdown(f"""
-<div class="hero">
-  <div class="eyebrow">Historical-data prototype</div>
-  <h1>Water Right Outlook</h1>
-  <p>Making Colorado water rights understandable — by translating river administration into a plain-English outlook.</p>
-  <div class="hero-footer">
-    <div class="small-muted">Selected date: {selected_date.strftime("%B %d, %Y")} · South Platte / Poudre framework</div>
-    <div class="badge">Current condition: {public_label}</div>
-  </div>
-</div>
-""", unsafe_allow_html=True)
-
-c1, c2, c3 = st.columns(3)
-with c1:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="kicker">Today’s condition</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="big" style="color:{REGIME_COLORS[current_regime]};">{public_label}</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="copy">{public_explain}</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-with c2:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="kicker">How unusual is today?</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="big">{hist_pct:.0f}th percentile</div>', unsafe_allow_html=True)
-    marker = max(0, min(100, hist_pct))
-    st.markdown(f"""
-    <div class="gauge-wrap">
-      <div class="gauge-track"><div class="gauge-marker" style="left:calc({marker:.1f}% - 2px);"></div></div>
-      <div class="gauge-labels"><span>Wet / available</span><span>Typical</span><span>Severe</span></div>
-    </div>
-    """, unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-with c3:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="kicker">30-day outlook</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="big" style="color:{REGIME_COLORS[most_likely]};">{most_likely_public}</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="copy">Most likely outcome: {prob_series.iloc[0]:.0%} probability.</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-st.markdown("")
-
-left, right = st.columns([1.08, .92], gap="large")
-with left:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="section-title">What could the basin look like in 30 days?</div>', unsafe_allow_html=True)
-    fig = go.Figure()
-    for regime in REGIME_ORDER:
-        public = PUBLIC_SHORT[regime]
-        fig.add_trace(go.Bar(
-            x=[prob_series.get(regime, 0)],
-            y=[public],
-            orientation="h",
-            marker_color=REGIME_COLORS[regime],
-            text=[f"{prob_series.get(regime, 0):.0%}"],
-            textposition="outside",
-            hovertemplate=f"{PUBLIC_LABELS[regime]}<br>%{{x:.0%}}<extra></extra>",
-            showlegend=False,
-        ))
-    fig.update_layout(
-        height=380,
-        margin=dict(l=10, r=35, t=10, b=10),
-        xaxis=dict(range=[0, 1], tickformat=".0%", gridcolor="rgba(255,255,255,.10)"),
-        yaxis=dict(categoryorder="array", categoryarray=[PUBLIC_SHORT[r] for r in reversed(REGIME_ORDER)]),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="#edf4f7", size=14),
-    )
-    st.plotly_chart(fig, use_container_width=True)
-    st.markdown('<div class="note">The displayed forecast includes an expert-rule overlay: if active administration is underway during irrigation season, Free River is removed as a 30-day outcome.</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-with right:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="section-title">What does this mean?</div>', unsafe_allow_html=True)
-    st.markdown(f"""
-    <div class="meaning-grid" style="grid-template-columns:1fr;">
-      <div class="meaning-card"><strong>For the public</strong><br><span class="copy">This is like a water-right outlook: not just how much water is in the river, but how the river is being administered.</span></div>
-      <div class="meaning-card"><strong>For water-right owners</strong><br><span class="copy">The outlook gives a plain-English signal of whether administrative pressure is likely to ease, hold, or tighten.</span></div>
-      <div class="meaning-card"><strong>For Northern Colorado</strong><br><span class="copy">The key issue is not only drought. It is whether priority administration becomes more restrictive.</span></div>
-    </div>
-    """, unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-st.markdown("")
-m1, m2, m3, m4 = st.columns(4)
-with m1:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="kicker">Current call signal</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="big" style="font-size:26px;">{priority}</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="copy">{structure}</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-with m2:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="kicker">Canyon-mouth flow</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="big" style="font-size:30px;">{flow_cfs:,.0f} cfs</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="copy">Seasonal flow percentile: {flow_pct:.0f}%</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-with m3:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="kicker">Comparable years</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="big" style="font-size:30px;">{", ".join(comps) if comps else "—"}</div>', unsafe_allow_html=True)
-    st.markdown('<div class="copy">Based on recent administrative severity near this point in the season.</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-with m4:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="kicker">Severity score</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="big" style="font-size:30px;">{score:.0f}/100</div>', unsafe_allow_html=True)
-    st.markdown('<div class="copy">Higher means more restrictive water-right administration.</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-st.markdown("### Administrative stress around selected date")
-window = model_df[(model_df["date"] >= selected_date - pd.Timedelta(days=90)) & (model_df["date"] <= selected_date + pd.Timedelta(days=90))]
-fig = go.Figure()
-fig.add_trace(go.Scatter(
-    x=window["date"], y=window["score"], mode="lines",
-    line=dict(color="#5ec9df", width=3),
-    fill="tozeroy", fillcolor="rgba(94,201,223,.12)",
-    hovertemplate="%{x|%b %d, %Y}<br>Severity: %{y}<extra></extra>",
-))
-fig.add_vline(x=selected_date, line_width=2, line_dash="dash", line_color="#ffffff")
-fig.update_layout(
-    height=340,
-    margin=dict(l=10, r=10, t=20, b=10),
-    yaxis=dict(title="Administrative severity", range=[0, 105], gridcolor="rgba(255,255,255,.10)"),
-    xaxis=dict(gridcolor="rgba(255,255,255,.06)"),
-    paper_bgcolor="rgba(0,0,0,0)",
-    plot_bgcolor="rgba(0,0,0,0)",
-    font=dict(color="#edf4f7"),
-)
-st.plotly_chart(fig, use_container_width=True)
+    return probs, pd.DataFrame(path_records), hydro
 
 
 st.markdown("### Stochastic hydrology outlook")
+st.caption("Fast Monte Carlo prototype using 150 simulated hydrology paths.")
 
-with st.spinner("Running stochastic hydrology simulation..."):
-    stoch_probs, stoch_paths, hydro_model = simulate_stochastic_outlook(
-        model_df,
-        clf,
-        le,
-        row.copy(),
-        n_sims=500,
-        horizons=(30, 60, 90),
-        seed=42,
-    )
+stoch_probs, stoch_paths, hydro_model = simulate_stochastic_outlook(
+    model_df,
+    clf,
+    le,
+    row.copy(),
+    n_sims=150,
+    horizons=(30, 60, 90),
+    seed=42,
+)
 
 c_stoch1, c_stoch2 = st.columns([0.68, 0.32], gap="large")
 

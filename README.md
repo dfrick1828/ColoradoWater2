@@ -61,3 +61,8 @@ This build adds a visible stochastic hydrology section:
 - Cross-correlation diagnostics between flow and call-depth score
 - Seasonal AR(1) Monte Carlo hydrology simulation
 - 30/60/90-day stochastic regime probabilities
+
+
+## Fast stochastic patch
+
+Reduced Monte Carlo paths to 150, batched classifier predictions, and removed the long spinner so Streamlit Cloud resolves quickly.
