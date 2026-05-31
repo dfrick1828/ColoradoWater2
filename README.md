@@ -159,3 +159,7 @@ Clean rebuild from the stable Water Outlook app. Added visible, direct dashboard
 - Well Permit Search with permit, receipt, and county inputs.
 
 The search sections are rendered directly in the dashboard, not through hidden/nested function calls.
+
+
+## Latest fix
+Added missing `import re` for decree case normalization and confirmed syntax compiles.
