@@ -1642,126 +1642,6 @@ def render_well_permit_search_engine():
         st.info("Enter a permit number, receipt number, or county to preview well permit records. The API links above update as you type.")
 
 
-
-# -----------------------------
-# Decree document access engine
-# -----------------------------
-def normalize_water_court_case_four_digit(case_number: str) -> str:
-    """
-    Normalize for DWR/Laserfiche-style searches where the CW number often needs
-    four digits after CW.
-
-    Examples:
-    - 03CW99 -> 03CW0099
-    - 03CW099 -> 03CW0099
-    - 03CW3099 -> 03CW3099
-    - 2003CW99 -> 03CW0099
-    """
-    if case_number is None:
-        return ""
-    s = str(case_number).strip().upper()
-    s = re.sub(r"[^0-9A-Z]", "", s)
-
-    m = re.match(r"^(?:20)?(\d{2})CW0*(\d+)$", s)
-    if m:
-        yy, num = m.groups()
-        return f"{yy}CW{int(num):04d}"
-
-    m = re.match(r"^(\d{4})CW0*(\d+)$", s)
-    if m:
-        yyyy, num = m.groups()
-        return f"{yyyy[-2:]}CW{int(num):04d}"
-
-    return s
-
-
-def dwr_research_records_url() -> str:
-    """
-    DWR Research Records landing page. This is the public entry point to
-    Laserfiche Weblink / imaged documents.
-    """
-    return "https://dwr.colorado.gov/services/records-research"
-
-
-def dwr_laserfiche_weblink_url() -> str:
-    """
-    Public DWR Laserfiche Weblink landing page. The exact search form is session-based,
-    so this link opens the document search interface.
-    """
-    return "https://dnrweblink.state.co.us/dwr/"
-
-
-def colorado_water_courts_url() -> str:
-    return "https://www.coloradojudicial.gov/water-courts"
-
-
-def render_decree_document_access_engine():
-    st.markdown("### Decree Document Access")
-    st.caption(
-        "Open the public DWR imaged-record system for water court decrees. "
-        "Use the normalized case number in the Laserfiche Water Court search."
-    )
-
-    dc1, dc2, dc3 = st.columns([0.46, 0.27, 0.27])
-    with dc1:
-        decree_case_input = st.text_input(
-            "Water court case number",
-            value="03CW099",
-            placeholder="Example: 03CW099",
-            key="decree_case_number_visible",
-        )
-    with dc2:
-        decree_division = st.selectbox(
-            "Water division",
-            ["Division 1", "Division 2", "Division 3", "Division 4", "Division 5", "Division 6", "Division 7", "Unknown"],
-            index=0,
-            key="decree_division_visible",
-        )
-    with dc3:
-        normalized_decree_case = normalize_water_court_case_four_digit(decree_case_input)
-        st.markdown('<div class="kicker">Search as</div>', unsafe_allow_html=True)
-        st.markdown(f"<div class='big' style='font-size:24px;'>{normalized_decree_case}</div>", unsafe_allow_html=True)
-
-    link_a, link_b, link_c = st.columns(3)
-    with link_a:
-        st.link_button("Open DWR Research Records", dwr_research_records_url(), use_container_width=True)
-    with link_b:
-        st.link_button("Open Laserfiche Weblink", dwr_laserfiche_weblink_url(), use_container_width=True)
-    with link_c:
-        st.link_button("Open Water Courts", colorado_water_courts_url(), use_container_width=True)
-
-    st.info(
-        f"To find the decree: open Laserfiche Weblink → choose **Water Court** → select **{decree_division}** "
-        f"if known → search **Case Number: {normalized_decree_case}** → open the document labeled **Decree**."
-    )
-
-    # Reuse transaction metadata fetch if it exists. This gives context plus caseNumberUrl candidates.
-    if "fetch_case_transactions" in globals():
-        try:
-            tx, request_url = fetch_case_transactions(normalized_decree_case, None)
-            st.caption(f"Transaction metadata request: {request_url}")
-            if tx.empty:
-                st.warning("No transaction metadata returned for this case number.")
-            else:
-                st.success(f"Found {len(tx):,} transaction record(s) connected to {normalized_decree_case}.")
-                preferred_cols = [
-                    "caseNumber", "caseNumberUrl", "wdid", "structureName", "waterDistrict",
-                    "waterSource", "appropriationDate", "signatureDate", "adminNumber",
-                    "decreedUses", "maxDecreedRate", "maxDecreedVolume"
-                ]
-                cols = [c for c in preferred_cols if c in tx.columns]
-                st.dataframe(tx[cols] if cols else tx, use_container_width=True, height=240)
-
-                if "caseNumberUrl" in tx.columns:
-                    urls = [u for u in tx["caseNumberUrl"].dropna().astype(str).unique() if u and u.lower() != "nan"]
-                    if urls:
-                        st.markdown("**Case URLs returned by CDSS:**")
-                        for i, u in enumerate(urls[:10], start=1):
-                            st.markdown(f"{i}. [{u}]({u})")
-        except Exception as e:
-            st.caption(f"Transaction metadata preview not loaded: {e}")
-
-
 def render_case_link_engine():
     st.markdown("### Water Court Case Link")
     st.caption("Enter a case number to open CDSS transaction records and preview the associated water-right transaction metadata.")
@@ -1885,6 +1765,183 @@ def render_well_permit_search_engine():
             st.caption(f"Action history not loaded: {e}")
     else:
         st.info("Enter a permit number, receipt number, or county to preview well permit records. The API links above update as you type.")
+
+
+
+# -----------------------------
+# Visible water court decree / case search engine
+# -----------------------------
+def normalize_water_court_case_three_digit(case_number: str) -> str:
+    if case_number is None:
+        return ""
+    s = str(case_number).strip().upper()
+    s = re.sub(r"[^0-9A-Z]", "", s)
+
+    m = re.match(r"^(?:20)?(\d{2})CW0*(\d+)$", s)
+    if m:
+        yy, num = m.groups()
+        return f"{yy}CW{int(num):03d}"
+
+    m = re.match(r"^(\d{4})CW0*(\d+)$", s)
+    if m:
+        yyyy, num = m.groups()
+        return f"{yyyy[-2:]}CW{int(num):03d}"
+
+    return s
+
+
+def normalize_water_court_case_four_digit(case_number: str) -> str:
+    if case_number is None:
+        return ""
+    s = str(case_number).strip().upper()
+    s = re.sub(r"[^0-9A-Z]", "", s)
+
+    m = re.match(r"^(?:20)?(\d{2})CW0*(\d+)$", s)
+    if m:
+        yy, num = m.groups()
+        return f"{yy}CW{int(num):04d}"
+
+    m = re.match(r"^(\d{4})CW0*(\d+)$", s)
+    if m:
+        yyyy, num = m.groups()
+        return f"{yyyy[-2:]}CW{int(num):04d}"
+
+    return s
+
+
+def cdss_case_transaction_rest_url_v2(case_number: str, water_division: int | None = None) -> str:
+    case = normalize_water_court_case_three_digit(case_number)
+    params = [
+        f"caseNumber={quote_plus(case)}",
+        "format=json",
+        "pageSize=500000",
+    ]
+    if water_division:
+        params.append(f"division={int(water_division)}")
+    return "https://dwr.state.co.us/Rest/GET/api/v2/waterrights/transaction?" + "&".join(params)
+
+
+def dwr_laserfiche_decree_url_v2() -> str:
+    return "https://dnrweblink.state.co.us/dwr/"
+
+
+def dwr_research_records_url_v2() -> str:
+    return "https://dwr.colorado.gov/services/records-research"
+
+
+@st.cache_data(ttl=60 * 60, show_spinner=False)
+def fetch_case_transactions_v2(case_number: str, water_division: int | None = None) -> tuple[pd.DataFrame, str]:
+    case = normalize_water_court_case_three_digit(case_number)
+    params = {
+        "caseNumber": case,
+        "format": "json",
+        "pageSize": "500000",
+    }
+    if water_division:
+        params["division"] = int(water_division)
+
+    headers = {}
+    try:
+        api_key = st.secrets.get("CDSS_API_KEY", "")
+        if api_key:
+            headers["ApiKey"] = api_key
+    except Exception:
+        pass
+
+    url = "https://dwr.state.co.us/Rest/GET/api/v2/waterrights/transaction"
+    r = requests.get(url, params=params, headers=headers, timeout=35)
+    r.raise_for_status()
+    data = r.json()
+
+    if isinstance(data, dict) and "ResultList" in data:
+        rows = data["ResultList"]
+    elif isinstance(data, list):
+        rows = data
+    else:
+        rows = []
+
+    return pd.DataFrame(rows), r.url
+
+
+def render_decree_search_engine_v2():
+    st.markdown("### Water Court Decree Search")
+    st.caption("Search by case number and Water Division. The buttons open the CDSS transaction API and the DWR imaged-record system used to access decree documents.")
+
+    d1, d2, d3 = st.columns([0.44, 0.28, 0.28])
+    with d1:
+        case_input = st.text_input(
+            "Case number",
+            value="03CW099",
+            placeholder="Example: 03CW099",
+            key="decree_case_number_v2",
+        )
+    with d2:
+        division_label = st.selectbox(
+            "Water Division",
+            ["Division 1", "Division 2", "Division 3", "Division 4", "Division 5", "Division 6", "Division 7"],
+            index=0,
+            key="decree_water_division_v2",
+        )
+    with d3:
+        div_num = int(division_label.split()[-1])
+        normalized_lf = normalize_water_court_case_four_digit(case_input)
+        st.markdown('<div class="kicker">Laserfiche Search</div>', unsafe_allow_html=True)
+        st.markdown(f"<div class='big' style='font-size:24px;'>{normalized_lf}</div>", unsafe_allow_html=True)
+
+    normalized_cdss = normalize_water_court_case_three_digit(case_input)
+    div_num = int(division_label.split()[-1])
+
+    b1, b2, b3 = st.columns(3)
+    with b1:
+        st.link_button(
+            "Open CDSS Case API",
+            cdss_case_transaction_rest_url_v2(normalized_cdss, div_num),
+            use_container_width=True,
+        )
+    with b2:
+        st.link_button(
+            "Open DWR Imaged Records",
+            dwr_laserfiche_decree_url_v2(),
+            use_container_width=True,
+        )
+    with b3:
+        st.link_button(
+            "Open DWR Records Help",
+            dwr_research_records_url_v2(),
+            use_container_width=True,
+        )
+
+    st.info(
+        f"For the decree document: open DWR Imaged Records → Water Court → {division_label} → "
+        f"search case number **{normalized_lf}**. The CDSS API link above pulls transaction metadata for **{normalized_cdss}** scoped to **{division_label}**."
+    )
+
+    try:
+        tx, request_url = fetch_case_transactions_v2(normalized_cdss, div_num)
+        st.caption(f"CDSS transaction API request: {request_url}")
+
+        if tx.empty:
+            st.warning("No CDSS transaction records returned for this case number and division.")
+        else:
+            st.success(f"Found {len(tx):,} CDSS transaction record(s) for {normalized_cdss} in {division_label}.")
+            preferred_cols = [
+                "caseNumber", "caseNumberUrl", "wdid", "structureName", "waterDistrict",
+                "waterSource", "appropriationDate", "signatureDate", "adminNumber",
+                "decreedUses", "maxDecreedRate", "maxDecreedVolume"
+            ]
+            cols = [c for c in preferred_cols if c in tx.columns]
+            st.dataframe(tx[cols] if cols else tx, use_container_width=True, height=260)
+
+            if "caseNumberUrl" in tx.columns:
+                urls = [u for u in tx["caseNumberUrl"].dropna().astype(str).unique() if u and u.lower() != "nan"]
+                if urls:
+                    st.markdown("**Case URLs returned by CDSS:**")
+                    for i, u in enumerate(urls[:10], start=1):
+                        st.markdown(f"{i}. [{u}]({u})")
+
+    except Exception as e:
+        st.warning(f"Could not fetch CDSS transaction metadata: {e}")
+        st.caption("The direct API and DWR imaged-record links above are still available.")
 
 
 st.sidebar.title("Scenario")
