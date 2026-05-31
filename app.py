@@ -104,6 +104,34 @@ def parse_cdss_date(value):
             return pd.NaT
 
 
+
+def percent_of_average_flow(flow_cfs, model_df, target_date):
+    """
+    Compare current flow to the historical average flow for this day of year.
+    Returns percent of average.
+    """
+    try:
+        target_date = pd.Timestamp(target_date)
+        doy = target_date.dayofyear
+
+        if "doy" not in model_df.columns:
+            model_df = model_df.copy()
+            model_df["doy"] = pd.to_datetime(model_df["date"]).dt.dayofyear
+
+        same_day = model_df[model_df["doy"] == doy]
+
+        if len(same_day) == 0:
+            return None
+
+        avg_flow = pd.to_numeric(same_day["flow_cfs"], errors="coerce").mean()
+
+        if avg_flow and avg_flow > 0:
+            return float(flow_cfs / avg_flow * 100)
+
+        return None
+    except Exception:
+        return None
+
 def format_call_date_mmddyyyy(value):
     """Format CDSS priority/call dates as MM/DD/YYYY for public display."""
     try:
@@ -292,8 +320,9 @@ st.markdown("""
   border-radius: 34px;
   padding: 42px;
   background:
-    linear-gradient(90deg, rgba(4,12,18,.97), rgba(4,12,18,.74), rgba(4,12,18,.28)),
-    url('https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1800&q=80');
+    
+    linear-gradient(90deg, rgba(4,12,18,.94), rgba(4,12,18,.68), rgba(4,12,18,.25)),
+    var(--poudre-bg);
   background-size: cover;
   background-position: center;
   box-shadow: 0 35px 110px rgba(0,0,0,.42);
@@ -1322,6 +1351,18 @@ st.sidebar.title("Scenario")
 
 st.markdown("""
 <style>
+.hero {
+  background:
+    linear-gradient(90deg, rgba(4,12,18,.94), rgba(4,12,18,.68), rgba(4,12,18,.25)),
+    var(--poudre-bg) !important;
+  background-size: cover !important;
+  background-position: center !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<style>
 /* Final cleanup: remove decorative long rounded dividers/capsules */
 .metric-row,
 .pill,
@@ -1410,6 +1451,11 @@ score = float(row.iloc[0]["score"])
 priority = format_call_date_mmddyyyy(row.iloc[0].get("controlling_priority_date", "—"))
 structure = row.iloc[0].get("controlling_priority_structure", "—")
 flow_cfs = float(row.iloc[0].get("flow_cfs", np.nan))
+
+try:
+    flow_pct_avg = percent_of_average_flow(flow_cfs, model_df, selected_date)
+except Exception:
+    flow_pct_avg = None
 flow_pct = float(row.iloc[0].get("flow_doy_percentile", np.nan))
 comps = comparable_years(model_df, selected_date, score)
 
@@ -1418,8 +1464,12 @@ public_explain = PUBLIC_EXPLAIN[current_regime]
 most_likely = prob_series.index[0]
 most_likely_public = PUBLIC_LABELS[most_likely]
 
+
+poudre_img64 = image_to_base64("assets/poudre_river_hero.jpg")
+poudre_bg = f"url('data:image/jpeg;base64,{poudre_img64}')" if poudre_img64 else "url('https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1800&q=80')"
+
 st.markdown(f"""
-<div class="hero">
+<div class="hero" style="--poudre-bg: {poudre_bg};">
   <div class="eyebrow">Historical-data prototype</div>
   <h1>Water Right Outlook</h1>
   <p>Making Colorado water rights understandable — by translating river administration into a plain-English outlook.</p>
@@ -1506,12 +1556,12 @@ st.markdown("")
 
 st.markdown("### Supporting Hydrology and Context")
 
-h1, h2, h3 = st.columns(3)
+h1, h2 = st.columns(2)
 
 with h1:
     st.markdown('<div class="kicker">Canyon-Mouth Flow</div>', unsafe_allow_html=True)
     st.markdown(f'<div class="big" style="font-size:30px;">{flow_cfs:,.0f} cfs</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="copy">Seasonal flow percentile: {flow_pct:.0f}%</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="copy">{flow_pct_avg:.0f}% of average for this date</div>', unsafe_allow_html=True) if flow_pct_avg is not None else st.markdown('<div class="copy">Average flow unavailable</div>', unsafe_allow_html=True)
 
 with h2:
     st.markdown('<div class="kicker">Comparable Years</div>', unsafe_allow_html=True)
@@ -1519,9 +1569,9 @@ with h2:
     st.markdown('<div class="copy">Based on recent administrative severity near this point in the season.</div>', unsafe_allow_html=True)
 
 with h3:
-    st.markdown('<div class="kicker">Severity Score</div>', unsafe_allow_html=True)
+    st.markdown('<div class="kicker"></div>', unsafe_allow_html=True)
     st.markdown(f'<div class="big" style="font-size:30px;">{score:.0f}/100</div>', unsafe_allow_html=True)
-    st.markdown('<div class="copy">Higher means more restrictive water-right administration.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="copy"></div>', unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
 

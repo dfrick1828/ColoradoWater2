@@ -130,3 +130,14 @@ Simplified the top of the dashboard to three primary public-facing metrics:
 3. 30-Day Outlook
 
 Flow, comparable years, and severity score were moved into a secondary Supporting Hydrology and Context section.
+
+
+## Latest change
+
+Replaced the hero background with a local Cache la Poudre River canyon image stored at `assets/poudre_river_hero.jpg`.
+
+
+## Latest change
+
+- Removed Severity Score from the dashboard.
+- Replaced flow percentile with percent of average flow for the selected/current date based on historical records for the same day of year.
