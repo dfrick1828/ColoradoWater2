@@ -152,31 +152,10 @@ Replaced fragile CSS background image with a reliable Streamlit `st.image()` cal
 ## Latest change
 Poudre River image is embedded as a base64 CSS background behind the Water Outlook hero title.
 
-
 ## Latest change
 
-Added a Water Court Case Link engine:
-- normalizes case numbers such as `03CW99` to `03CW099`;
-- provides a direct CDSS Water Rights Transactions link;
-- provides a direct REST JSON link;
-- previews returned CDSS transaction/decree metadata in the dashboard;
-- displays CDSS `caseNumberUrl` candidates when returned by the API.
+Clean rebuild from the stable Water Outlook app. Added visible, direct dashboard sections for:
+- Water Court Decree Search with Water Division selector and CDSS transaction metadata API link.
+- Well Permit Search with permit, receipt, and county inputs.
 
-This does not yet ingest the full decree/OCR text; it creates direct linkage from the website to court case transaction records and any case URLs returned by CDSS.
-
-
-## Latest change
-
-Added a Well Permit Search engine:
-- points to CDSS `/api/v2/wellpermits/wellpermit`;
-- points to CDSS `/api/v2/wellpermits/wellpermitactionhistory`;
-- supports permit number, receipt number, and county searches;
-- previews well permit records and action history when available.
-
-
-## Latest fix
-Moved the Well Permit Search UI into the visible dashboard flow before the 30-Day Outlook chart and added unique input keys.
-
-## Latest fix
-
-Made the Water Court Decree Search visibly render in the dashboard and added a Water Division selector. The CDSS transaction API link now includes the selected division parameter, and the Laserfiche/decree search instruction uses the selected Water Division and the four-digit CW case format.
+The search sections are rendered directly in the dashboard, not through hidden/nested function calls.

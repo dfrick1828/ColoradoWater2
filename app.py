@@ -1344,502 +1344,53 @@ def get_model_row_for_date(model_df, selected_date):
 
 
 # -----------------------------
-# Water court case link engine
+# Decree and well permit search helpers
 # -----------------------------
-def normalize_water_court_case(case_number: str) -> str:
-    """
-    Normalize user-entered water court case numbers to a CDSS-friendly form.
-
-    Examples:
-    - 03CW099 -> 03CW099
-    - 03CW99  -> 03CW099
-    - 2003CW099 -> 03CW099
-    - 03 CW 99 -> 03CW099
-    """
-    if case_number is None:
-        return ""
-    s = str(case_number).strip().upper()
+def normalize_decree_case_for_cdss(case_number):
+    s = str(case_number or "").strip().upper()
     s = re.sub(r"[^0-9A-Z]", "", s)
-
     m = re.match(r"^(?:20)?(\d{2})CW0*(\d+)$", s)
     if m:
         yy, num = m.groups()
         return f"{yy}CW{int(num):03d}"
-
     m = re.match(r"^(\d{4})CW0*(\d+)$", s)
     if m:
         yyyy, num = m.groups()
         return f"{yyyy[-2:]}CW{int(num):03d}"
-
     return s
 
 
-def cdss_case_search_url(case_number: str) -> str:
-    """
-    Link to CDSS Water Rights Transactions filtered by case number.
-    This uses the public CDSS water-rights transaction tool.
-    """
-    case = normalize_water_court_case(case_number)
-    return f"https://dwr.state.co.us/Tools/WaterRights/Transactions?caseNumber={quote_plus(case)}"
-
-
-def cdss_case_rest_url(case_number: str, water_district: int | None = None) -> str:
-    """
-    REST query for transaction/decree metadata by case number.
-    """
-    case = normalize_water_court_case(case_number)
-    url = f"https://dwr.state.co.us/Rest/GET/api/v2/waterrights/transaction?caseNumber={quote_plus(case)}&format=json&pageSize=500000"
-    if water_district is not None:
-        url += f"&waterDistrict={int(water_district)}"
-    return url
-
-
-@st.cache_data(ttl=60 * 60, show_spinner=False)
-def fetch_case_transactions(case_number: str, water_district: int | None = None) -> tuple[pd.DataFrame, str]:
-    """
-    Fetch water-right transaction/decree metadata for a water court case.
-    """
-    case = normalize_water_court_case(case_number)
-    params = {
-        "caseNumber": case,
-        "format": "json",
-        "pageSize": "500000",
-    }
-    if water_district is not None:
-        params["waterDistrict"] = int(water_district)
-
-    headers = {}
-    try:
-        api_key = st.secrets.get("CDSS_API_KEY", "")
-        if api_key:
-            headers["ApiKey"] = api_key
-    except Exception:
-        pass
-
-    url = "https://dwr.state.co.us/Rest/GET/api/v2/waterrights/transaction"
-    r = requests.get(url, params=params, headers=headers, timeout=35)
-    r.raise_for_status()
-    data = r.json()
-
-    if isinstance(data, dict) and "ResultList" in data:
-        rows = data["ResultList"]
-    elif isinstance(data, list):
-        rows = data
-    else:
-        rows = []
-
-    return pd.DataFrame(rows), r.url
-
-
-
-# -----------------------------
-# Well permit search engine
-# -----------------------------
-def normalize_well_permit_number(permit_number: str) -> str:
-    """
-    Normalize a user-entered well permit number for CDSS lookup.
-    Keeps letters, numbers, and common suffixes but removes extra whitespace.
-    """
-    if permit_number is None:
-        return ""
-    return str(permit_number).strip().upper()
-
-
-def cdss_well_permit_rest_url(permit_number: str = "", receipt: str = "", county: str = "") -> str:
-    """
-    REST query for well permit records.
-
-    CDSS endpoint:
-    /api/v2/wellpermits/wellpermit
-    """
-    params = ["format=json", "pageSize=500000"]
-
-    permit = normalize_well_permit_number(permit_number)
-    if permit:
-        params.append(f"permitNumber={quote_plus(permit)}")
-
-    receipt = str(receipt).strip()
-    if receipt:
-        params.append(f"receipt={quote_plus(receipt)}")
-
-    county = str(county).strip()
-    if county:
-        params.append(f"county={quote_plus(county)}")
-
-    return "https://dwr.state.co.us/Rest/GET/api/v2/wellpermits/wellpermit?" + "&".join(params)
-
-
-def cdss_well_permit_action_rest_url(permit_number: str = "", receipt: str = "") -> str:
-    """
-    REST query for well permit action history.
-    """
-    params = ["format=json", "pageSize=500000"]
-
-    permit = normalize_well_permit_number(permit_number)
-    if permit:
-        params.append(f"permitNumber={quote_plus(permit)}")
-
-    receipt = str(receipt).strip()
-    if receipt:
-        params.append(f"receipt={quote_plus(receipt)}")
-
-    return "https://dwr.state.co.us/Rest/GET/api/v2/wellpermits/wellpermitactionhistory?" + "&".join(params)
-
-
-@st.cache_data(ttl=60 * 60, show_spinner=False)
-def fetch_well_permits(permit_number: str = "", receipt: str = "", county: str = "") -> tuple[pd.DataFrame, str]:
-    """
-    Fetch well permit records from CDSS.
-    """
-    params = {
-        "format": "json",
-        "pageSize": "500000",
-    }
-
-    permit = normalize_well_permit_number(permit_number)
-    if permit:
-        params["permitNumber"] = permit
-
-    receipt = str(receipt).strip()
-    if receipt:
-        params["receipt"] = receipt
-
-    county = str(county).strip()
-    if county:
-        params["county"] = county
-
-    headers = {}
-    try:
-        api_key = st.secrets.get("CDSS_API_KEY", "")
-        if api_key:
-            headers["ApiKey"] = api_key
-    except Exception:
-        pass
-
-    url = "https://dwr.state.co.us/Rest/GET/api/v2/wellpermits/wellpermit"
-    r = requests.get(url, params=params, headers=headers, timeout=35)
-    r.raise_for_status()
-    data = r.json()
-
-    if isinstance(data, dict) and "ResultList" in data:
-        rows = data["ResultList"]
-    elif isinstance(data, list):
-        rows = data
-    else:
-        rows = []
-
-    return pd.DataFrame(rows), r.url
-
-
-@st.cache_data(ttl=60 * 60, show_spinner=False)
-def fetch_well_permit_actions(permit_number: str = "", receipt: str = "") -> tuple[pd.DataFrame, str]:
-    """
-    Fetch well permit action history from CDSS.
-    """
-    params = {
-        "format": "json",
-        "pageSize": "500000",
-    }
-
-    permit = normalize_well_permit_number(permit_number)
-    if permit:
-        params["permitNumber"] = permit
-
-    receipt = str(receipt).strip()
-    if receipt:
-        params["receipt"] = receipt
-
-    headers = {}
-    try:
-        api_key = st.secrets.get("CDSS_API_KEY", "")
-        if api_key:
-            headers["ApiKey"] = api_key
-    except Exception:
-        pass
-
-    url = "https://dwr.state.co.us/Rest/GET/api/v2/wellpermits/wellpermitactionhistory"
-    r = requests.get(url, params=params, headers=headers, timeout=35)
-    r.raise_for_status()
-    data = r.json()
-
-    if isinstance(data, dict) and "ResultList" in data:
-        rows = data["ResultList"]
-    elif isinstance(data, list):
-        rows = data
-    else:
-        rows = []
-
-    return pd.DataFrame(rows), r.url
-
-
-def render_well_permit_search_engine():
-    st.markdown("### Well Permit Search")
-    st.caption("Search CDSS well permits and open the underlying REST API calls.")
-
-    w1, w2, w3 = st.columns([0.45, 0.30, 0.25])
-    with w1:
-        permit_input = st.text_input("Permit number", value="", placeholder="Example: 12345-F", key="well_permit_number")
-    with w2:
-        receipt_input = st.text_input("Receipt number", value="", placeholder="Optional", key="well_receipt_number")
-    with w3:
-        county_input = st.text_input("County", value="", placeholder="Optional", key="well_county")
-
-    permit_norm = normalize_well_permit_number(permit_input)
-
-    link_col1, link_col2 = st.columns(2)
-    with link_col1:
-        st.link_button(
-            "Open Well Permit REST API",
-            cdss_well_permit_rest_url(permit_norm, receipt_input, county_input),
-            use_container_width=True,
-        )
-    with link_col2:
-        st.link_button(
-            "Open Permit Action History REST API",
-            cdss_well_permit_action_rest_url(permit_norm, receipt_input),
-            use_container_width=True,
-        )
-
-    run_search = bool(permit_norm or receipt_input.strip() or county_input.strip())
-
-    if run_search:
-        try:
-            permits, permit_url = fetch_well_permits(permit_norm, receipt_input, county_input)
-            st.caption(f"Permit REST request: {permit_url}")
-
-            if permits.empty:
-                st.warning("No well permit records returned for this search.")
-            else:
-                st.success(f"Found {len(permits):,} well permit record(s).")
-                preferred_cols = [
-                    "permitNumber", "receipt", "wellName", "county", "division", "waterDistrict",
-                    "managementDistrict", "designatedBasin", "permitStatus", "permitType",
-                    "use", "totalDepth", "staticWaterLevel", "latitude", "longitude",
-                    "dateIssued", "dateCompleted", "parcelName"
-                ]
-                cols = [c for c in preferred_cols if c in permits.columns]
-                st.dataframe(permits[cols] if cols else permits, use_container_width=True, height=260)
-
-        except Exception as e:
-            st.warning(f"Could not fetch well permit records from CDSS: {e}")
-
-        try:
-            actions, action_url = fetch_well_permit_actions(permit_norm, receipt_input)
-            st.caption(f"Action history REST request: {action_url}")
-
-            if not actions.empty:
-                with st.expander("Well permit action history"):
-                    preferred_action_cols = [
-                        "permitNumber", "receipt", "actionDate", "actionName",
-                        "actionComment", "permitStatus", "wellName"
-                    ]
-                    action_cols = [c for c in preferred_action_cols if c in actions.columns]
-                    st.dataframe(actions[action_cols] if action_cols else actions, use_container_width=True, height=260)
-
-        except Exception as e:
-            st.caption(f"Action history not loaded: {e}")
-    else:
-        st.info("Enter a permit number, receipt number, or county to preview well permit records. The API links above update as you type.")
-
-
-def render_case_link_engine():
-    st.markdown("### Water Court Case Link")
-    st.caption("Enter a case number to open CDSS transaction records and preview the associated water-right transaction metadata.")
-
-    case_col, wd_col = st.columns([0.72, 0.28])
-    with case_col:
-        case_input = st.text_input("Case number", value="03CW099", placeholder="Example: 03CW099")
-    with wd_col:
-        district_input = st.text_input("Optional water district", value="", placeholder="3")
-
-    normalized_case = normalize_water_court_case(case_input)
-    district_value = None
-    if district_input.strip():
-        try:
-            district_value = int(district_input.strip())
-        except Exception:
-            district_value = None
-
-    link_col1, link_col2 = st.columns(2)
-    with link_col1:
-        st.link_button("Open CDSS Case Search", cdss_case_search_url(normalized_case), use_container_width=True)
-    with link_col2:
-        st.link_button("Open REST JSON", cdss_case_rest_url(normalized_case, district_value), use_container_width=True)
-
-    try:
-        tx, request_url = fetch_case_transactions(normalized_case, district_value)
-        st.caption(f"REST request: {request_url}")
-
-        if tx.empty:
-            st.warning("No CDSS transaction records returned for this case number. The decree may exist outside this endpoint, the case number may be formatted differently, or the document/OCR endpoint may be separate.")
-        else:
-            st.success(f"Found {len(tx):,} transaction record(s) for {normalized_case}.")
-            preferred_cols = [
-                "caseNumber", "caseNumberUrl", "wdid", "structureName", "waterDistrict",
-                "waterSource", "appropriationDate", "signatureDate", "adminNumber",
-                "decreedUses", "maxDecreedRate", "maxDecreedVolume"
-            ]
-            cols = [c for c in preferred_cols if c in tx.columns]
-            if cols:
-                st.dataframe(tx[cols], use_container_width=True, height=260)
-            else:
-                st.dataframe(tx, use_container_width=True, height=260)
-
-            if "caseNumberUrl" in tx.columns:
-                urls = [u for u in tx["caseNumberUrl"].dropna().astype(str).unique() if u]
-                if urls:
-                    st.markdown("**Case document/link candidates returned by CDSS:**")
-                    for i, u in enumerate(urls[:10], start=1):
-                        st.markdown(f"{i}. [{u}]({u})")
-
-    except Exception as e:
-        st.warning(f"Could not fetch case transactions from CDSS: {e}")
-        st.caption("The direct CDSS and REST links above are still available.")
-
-
-def render_well_permit_search_engine():
-    st.markdown("### Well Permit Search")
-    st.caption("Search CDSS well permits and open the underlying REST API calls.")
-
-    w1, w2, w3 = st.columns([0.45, 0.30, 0.25])
-    with w1:
-        permit_input = st.text_input("Permit number", value="", placeholder="Example: 12345-F", key="well_permit_number_visible")
-    with w2:
-        receipt_input = st.text_input("Receipt number", value="", placeholder="Optional", key="well_receipt_number_visible")
-    with w3:
-        county_input = st.text_input("County", value="", placeholder="Optional", key="well_county_visible")
-
-    permit_norm = normalize_well_permit_number(permit_input)
-
-    link_col1, link_col2 = st.columns(2)
-    with link_col1:
-        st.link_button(
-            "Open Well Permit REST API",
-            cdss_well_permit_rest_url(permit_norm, receipt_input, county_input),
-            use_container_width=True,
-        )
-    with link_col2:
-        st.link_button(
-            "Open Permit Action History REST API",
-            cdss_well_permit_action_rest_url(permit_norm, receipt_input),
-            use_container_width=True,
-        )
-
-    run_search = bool(permit_norm or receipt_input.strip() or county_input.strip())
-
-    if run_search:
-        try:
-            permits, permit_url = fetch_well_permits(permit_norm, receipt_input, county_input)
-            st.caption(f"Permit REST request: {permit_url}")
-
-            if permits.empty:
-                st.warning("No well permit records returned for this search.")
-            else:
-                st.success(f"Found {len(permits):,} well permit record(s).")
-                preferred_cols = [
-                    "permitNumber", "receipt", "wellName", "county", "division", "waterDistrict",
-                    "managementDistrict", "designatedBasin", "permitStatus", "permitType",
-                    "use", "totalDepth", "staticWaterLevel", "latitude", "longitude",
-                    "dateIssued", "dateCompleted", "parcelName"
-                ]
-                cols = [c for c in preferred_cols if c in permits.columns]
-                st.dataframe(permits[cols] if cols else permits, use_container_width=True, height=260)
-
-        except Exception as e:
-            st.warning(f"Could not fetch well permit records from CDSS: {e}")
-
-        try:
-            actions, action_url = fetch_well_permit_actions(permit_norm, receipt_input)
-            st.caption(f"Action history REST request: {action_url}")
-
-            if not actions.empty:
-                with st.expander("Well permit action history"):
-                    preferred_action_cols = [
-                        "permitNumber", "receipt", "actionDate", "actionName",
-                        "actionComment", "permitStatus", "wellName"
-                    ]
-                    action_cols = [c for c in preferred_action_cols if c in actions.columns]
-                    st.dataframe(actions[action_cols] if action_cols else actions, use_container_width=True, height=260)
-
-        except Exception as e:
-            st.caption(f"Action history not loaded: {e}")
-    else:
-        st.info("Enter a permit number, receipt number, or county to preview well permit records. The API links above update as you type.")
-
-
-
-# -----------------------------
-# Visible water court decree / case search engine
-# -----------------------------
-def normalize_water_court_case_three_digit(case_number: str) -> str:
-    if case_number is None:
-        return ""
-    s = str(case_number).strip().upper()
+def normalize_decree_case_for_laserfiche(case_number):
+    s = str(case_number or "").strip().upper()
     s = re.sub(r"[^0-9A-Z]", "", s)
-
-    m = re.match(r"^(?:20)?(\d{2})CW0*(\d+)$", s)
-    if m:
-        yy, num = m.groups()
-        return f"{yy}CW{int(num):03d}"
-
-    m = re.match(r"^(\d{4})CW0*(\d+)$", s)
-    if m:
-        yyyy, num = m.groups()
-        return f"{yyyy[-2:]}CW{int(num):03d}"
-
-    return s
-
-
-def normalize_water_court_case_four_digit(case_number: str) -> str:
-    if case_number is None:
-        return ""
-    s = str(case_number).strip().upper()
-    s = re.sub(r"[^0-9A-Z]", "", s)
-
     m = re.match(r"^(?:20)?(\d{2})CW0*(\d+)$", s)
     if m:
         yy, num = m.groups()
         return f"{yy}CW{int(num):04d}"
-
     m = re.match(r"^(\d{4})CW0*(\d+)$", s)
     if m:
         yyyy, num = m.groups()
         return f"{yyyy[-2:]}CW{int(num):04d}"
-
     return s
 
 
-def cdss_case_transaction_rest_url_v2(case_number: str, water_division: int | None = None) -> str:
-    case = normalize_water_court_case_three_digit(case_number)
-    params = [
-        f"caseNumber={quote_plus(case)}",
-        "format=json",
-        "pageSize=500000",
-    ]
-    if water_division:
-        params.append(f"division={int(water_division)}")
-    return "https://dwr.state.co.us/Rest/GET/api/v2/waterrights/transaction?" + "&".join(params)
-
-
-def dwr_laserfiche_decree_url_v2() -> str:
-    return "https://dnrweblink.state.co.us/dwr/"
-
-
-def dwr_research_records_url_v2() -> str:
-    return "https://dwr.colorado.gov/services/records-research"
+def cdss_decree_transaction_url(case_number, division):
+    case = normalize_decree_case_for_cdss(case_number)
+    return (
+        "https://dwr.state.co.us/Rest/GET/api/v2/waterrights/transaction"
+        f"?caseNumber={quote_plus(case)}&division={int(division)}&format=json&pageSize=500000"
+    )
 
 
 @st.cache_data(ttl=60 * 60, show_spinner=False)
-def fetch_case_transactions_v2(case_number: str, water_division: int | None = None) -> tuple[pd.DataFrame, str]:
-    case = normalize_water_court_case_three_digit(case_number)
+def fetch_decree_transactions_direct(case_number, division):
+    case = normalize_decree_case_for_cdss(case_number)
     params = {
         "caseNumber": case,
+        "division": int(division),
         "format": "json",
         "pageSize": "500000",
     }
-    if water_division:
-        params["division"] = int(water_division)
-
     headers = {}
     try:
         api_key = st.secrets.get("CDSS_API_KEY", "")
@@ -1847,101 +1398,101 @@ def fetch_case_transactions_v2(case_number: str, water_division: int | None = No
             headers["ApiKey"] = api_key
     except Exception:
         pass
-
     url = "https://dwr.state.co.us/Rest/GET/api/v2/waterrights/transaction"
     r = requests.get(url, params=params, headers=headers, timeout=35)
     r.raise_for_status()
     data = r.json()
-
     if isinstance(data, dict) and "ResultList" in data:
         rows = data["ResultList"]
     elif isinstance(data, list):
         rows = data
     else:
         rows = []
-
     return pd.DataFrame(rows), r.url
 
 
-def render_decree_search_engine_v2():
-    st.markdown("### Water Court Decree Search")
-    st.caption("Search by case number and Water Division. The buttons open the CDSS transaction API and the DWR imaged-record system used to access decree documents.")
+def normalize_well_permit_number(permit_number):
+    return str(permit_number or "").strip().upper()
 
-    d1, d2, d3 = st.columns([0.44, 0.28, 0.28])
-    with d1:
-        case_input = st.text_input(
-            "Case number",
-            value="03CW099",
-            placeholder="Example: 03CW099",
-            key="decree_case_number_v2",
-        )
-    with d2:
-        division_label = st.selectbox(
-            "Water Division",
-            ["Division 1", "Division 2", "Division 3", "Division 4", "Division 5", "Division 6", "Division 7"],
-            index=0,
-            key="decree_water_division_v2",
-        )
-    with d3:
-        div_num = int(division_label.split()[-1])
-        normalized_lf = normalize_water_court_case_four_digit(case_input)
-        st.markdown('<div class="kicker">Laserfiche Search</div>', unsafe_allow_html=True)
-        st.markdown(f"<div class='big' style='font-size:24px;'>{normalized_lf}</div>", unsafe_allow_html=True)
 
-    normalized_cdss = normalize_water_court_case_three_digit(case_input)
-    div_num = int(division_label.split()[-1])
+def cdss_well_permit_rest_url(permit_number="", receipt="", county=""):
+    params = ["format=json", "pageSize=500000"]
+    permit = normalize_well_permit_number(permit_number)
+    if permit:
+        params.append(f"permitNumber={quote_plus(permit)}")
+    if str(receipt).strip():
+        params.append(f"receipt={quote_plus(str(receipt).strip())}")
+    if str(county).strip():
+        params.append(f"county={quote_plus(str(county).strip())}")
+    return "https://dwr.state.co.us/Rest/GET/api/v2/wellpermits/wellpermit?" + "&".join(params)
 
-    b1, b2, b3 = st.columns(3)
-    with b1:
-        st.link_button(
-            "Open CDSS Case API",
-            cdss_case_transaction_rest_url_v2(normalized_cdss, div_num),
-            use_container_width=True,
-        )
-    with b2:
-        st.link_button(
-            "Open DWR Imaged Records",
-            dwr_laserfiche_decree_url_v2(),
-            use_container_width=True,
-        )
-    with b3:
-        st.link_button(
-            "Open DWR Records Help",
-            dwr_research_records_url_v2(),
-            use_container_width=True,
-        )
 
-    st.info(
-        f"For the decree document: open DWR Imaged Records → Water Court → {division_label} → "
-        f"search case number **{normalized_lf}**. The CDSS API link above pulls transaction metadata for **{normalized_cdss}** scoped to **{division_label}**."
-    )
+def cdss_well_permit_action_rest_url(permit_number="", receipt=""):
+    params = ["format=json", "pageSize=500000"]
+    permit = normalize_well_permit_number(permit_number)
+    if permit:
+        params.append(f"permitNumber={quote_plus(permit)}")
+    if str(receipt).strip():
+        params.append(f"receipt={quote_plus(str(receipt).strip())}")
+    return "https://dwr.state.co.us/Rest/GET/api/v2/wellpermits/wellpermitactionhistory?" + "&".join(params)
 
+
+@st.cache_data(ttl=60 * 60, show_spinner=False)
+def fetch_well_permits_direct(permit_number="", receipt="", county=""):
+    params = {"format": "json", "pageSize": "500000"}
+    permit = normalize_well_permit_number(permit_number)
+    if permit:
+        params["permitNumber"] = permit
+    if str(receipt).strip():
+        params["receipt"] = str(receipt).strip()
+    if str(county).strip():
+        params["county"] = str(county).strip()
+    headers = {}
     try:
-        tx, request_url = fetch_case_transactions_v2(normalized_cdss, div_num)
-        st.caption(f"CDSS transaction API request: {request_url}")
+        api_key = st.secrets.get("CDSS_API_KEY", "")
+        if api_key:
+            headers["ApiKey"] = api_key
+    except Exception:
+        pass
+    url = "https://dwr.state.co.us/Rest/GET/api/v2/wellpermits/wellpermit"
+    r = requests.get(url, params=params, headers=headers, timeout=35)
+    r.raise_for_status()
+    data = r.json()
+    if isinstance(data, dict) and "ResultList" in data:
+        rows = data["ResultList"]
+    elif isinstance(data, list):
+        rows = data
+    else:
+        rows = []
+    return pd.DataFrame(rows), r.url
 
-        if tx.empty:
-            st.warning("No CDSS transaction records returned for this case number and division.")
-        else:
-            st.success(f"Found {len(tx):,} CDSS transaction record(s) for {normalized_cdss} in {division_label}.")
-            preferred_cols = [
-                "caseNumber", "caseNumberUrl", "wdid", "structureName", "waterDistrict",
-                "waterSource", "appropriationDate", "signatureDate", "adminNumber",
-                "decreedUses", "maxDecreedRate", "maxDecreedVolume"
-            ]
-            cols = [c for c in preferred_cols if c in tx.columns]
-            st.dataframe(tx[cols] if cols else tx, use_container_width=True, height=260)
 
-            if "caseNumberUrl" in tx.columns:
-                urls = [u for u in tx["caseNumberUrl"].dropna().astype(str).unique() if u and u.lower() != "nan"]
-                if urls:
-                    st.markdown("**Case URLs returned by CDSS:**")
-                    for i, u in enumerate(urls[:10], start=1):
-                        st.markdown(f"{i}. [{u}]({u})")
-
-    except Exception as e:
-        st.warning(f"Could not fetch CDSS transaction metadata: {e}")
-        st.caption("The direct API and DWR imaged-record links above are still available.")
+@st.cache_data(ttl=60 * 60, show_spinner=False)
+def fetch_well_permit_actions_direct(permit_number="", receipt=""):
+    params = {"format": "json", "pageSize": "500000"}
+    permit = normalize_well_permit_number(permit_number)
+    if permit:
+        params["permitNumber"] = permit
+    if str(receipt).strip():
+        params["receipt"] = str(receipt).strip()
+    headers = {}
+    try:
+        api_key = st.secrets.get("CDSS_API_KEY", "")
+        if api_key:
+            headers["ApiKey"] = api_key
+    except Exception:
+        pass
+    url = "https://dwr.state.co.us/Rest/GET/api/v2/wellpermits/wellpermitactionhistory"
+    r = requests.get(url, params=params, headers=headers, timeout=35)
+    r.raise_for_status()
+    data = r.json()
+    if isinstance(data, dict) and "ResultList" in data:
+        rows = data["ResultList"]
+    elif isinstance(data, list):
+        rows = data
+    else:
+        rows = []
+    return pd.DataFrame(rows), r.url
 
 
 st.sidebar.title("Scenario")
@@ -2163,7 +1714,142 @@ with h2:
 st.markdown("<br>", unsafe_allow_html=True)
 
 
-render_well_permit_search_engine()
+st.markdown("### Water Court Decree Search")
+st.caption("Search by water court case number and Water Division. This points to the CDSS transaction API and the DWR imaged-record system for decree documents.")
+
+dc1, dc2, dc3 = st.columns([0.44, 0.26, 0.30])
+with dc1:
+    decree_case_input_direct = st.text_input(
+        "Decree case number",
+        value="03CW099",
+        placeholder="Example: 03CW099",
+        key="decree_case_number_direct_visible",
+    )
+with dc2:
+    decree_division_direct = st.selectbox(
+        "Water Division",
+        [1, 2, 3, 4, 5, 6, 7],
+        index=0,
+        format_func=lambda x: f"Division {x}",
+        key="decree_division_direct_visible",
+    )
+with dc3:
+    cdss_case_direct = normalize_decree_case_for_cdss(decree_case_input_direct)
+    laserfiche_case_direct = normalize_decree_case_for_laserfiche(decree_case_input_direct)
+    st.markdown('<div class="kicker">Search formats</div>', unsafe_allow_html=True)
+    st.markdown(
+        f"<div class='copy'>CDSS: <b>{cdss_case_direct}</b><br>Laserfiche: <b>{laserfiche_case_direct}</b></div>",
+        unsafe_allow_html=True,
+    )
+
+dl1, dl2, dl3 = st.columns(3)
+with dl1:
+    st.link_button(
+        "Open CDSS Decree Metadata API",
+        cdss_decree_transaction_url(cdss_case_direct, decree_division_direct),
+        use_container_width=True,
+    )
+with dl2:
+    st.link_button(
+        "Open DWR Imaged Records",
+        "https://dnrweblink.state.co.us/dwr/",
+        use_container_width=True,
+    )
+with dl3:
+    st.link_button(
+        "Open DWR Records Help",
+        "https://dwr.colorado.gov/services/records-research",
+        use_container_width=True,
+    )
+
+st.info(
+    f"For the decree document: open DWR Imaged Records → Water Court → Division {decree_division_direct} "
+    f"→ search case number **{laserfiche_case_direct}**. The CDSS API link searches transaction metadata for **{cdss_case_direct}**."
+)
+
+try:
+    decree_tx_direct, decree_request_url_direct = fetch_decree_transactions_direct(
+        cdss_case_direct,
+        decree_division_direct,
+    )
+    st.caption(f"CDSS decree metadata API request: {decree_request_url_direct}")
+    if decree_tx_direct.empty:
+        st.warning("No CDSS transaction metadata returned for this case/division.")
+    else:
+        st.success(f"Found {len(decree_tx_direct):,} CDSS transaction record(s).")
+        preferred_decree_cols = [
+            "caseNumber", "caseNumberUrl", "wdid", "structureName", "waterDistrict",
+            "waterSource", "appropriationDate", "signatureDate", "adminNumber",
+            "decreedUses", "maxDecreedRate", "maxDecreedVolume"
+        ]
+        decree_cols = [c for c in preferred_decree_cols if c in decree_tx_direct.columns]
+        st.dataframe(decree_tx_direct[decree_cols] if decree_cols else decree_tx_direct, use_container_width=True, height=260)
+        if "caseNumberUrl" in decree_tx_direct.columns:
+            decree_urls = [
+                u for u in decree_tx_direct["caseNumberUrl"].dropna().astype(str).unique()
+                if u and u.lower() != "nan"
+            ]
+            if decree_urls:
+                st.markdown("**Case URLs returned by CDSS:**")
+                for i, u in enumerate(decree_urls[:10], start=1):
+                    st.markdown(f"{i}. [{u}]({u})")
+except Exception as e:
+    st.warning(f"Could not fetch CDSS decree metadata: {e}")
+
+st.markdown("### Well Permit Search")
+st.caption("Search CDSS well permits and open the underlying REST API calls.")
+
+w1, w2, w3 = st.columns([0.45, 0.30, 0.25])
+with w1:
+    permit_input = st.text_input("Permit number", value="", placeholder="Example: 12345-F", key="well_permit_number_visible")
+with w2:
+    receipt_input = st.text_input("Receipt number", value="", placeholder="Optional", key="well_receipt_number_visible")
+with w3:
+    county_input = st.text_input("County", value="", placeholder="Optional", key="well_county_visible")
+
+permit_norm = normalize_well_permit_number(permit_input)
+
+wp1, wp2 = st.columns(2)
+with wp1:
+    st.link_button("Open Well Permit REST API", cdss_well_permit_rest_url(permit_norm, receipt_input, county_input), use_container_width=True)
+with wp2:
+    st.link_button("Open Permit Action History REST API", cdss_well_permit_action_rest_url(permit_norm, receipt_input), use_container_width=True)
+
+if permit_norm or receipt_input.strip() or county_input.strip():
+    try:
+        permits_df, permit_url = fetch_well_permits_direct(permit_norm, receipt_input, county_input)
+        st.caption(f"Permit REST request: {permit_url}")
+        if permits_df.empty:
+            st.warning("No well permit records returned for this search.")
+        else:
+            st.success(f"Found {len(permits_df):,} well permit record(s).")
+            preferred_cols = [
+                "permitNumber", "receipt", "wellName", "county", "division", "waterDistrict",
+                "managementDistrict", "designatedBasin", "permitStatus", "permitType",
+                "use", "totalDepth", "staticWaterLevel", "latitude", "longitude",
+                "dateIssued", "dateCompleted", "parcelName"
+            ]
+            cols = [c for c in preferred_cols if c in permits_df.columns]
+            st.dataframe(permits_df[cols] if cols else permits_df, use_container_width=True, height=260)
+    except Exception as e:
+        st.warning(f"Could not fetch well permit records from CDSS: {e}")
+
+    try:
+        actions_df, action_url = fetch_well_permit_actions_direct(permit_norm, receipt_input)
+        st.caption(f"Action history REST request: {action_url}")
+        if not actions_df.empty:
+            with st.expander("Well permit action history"):
+                preferred_action_cols = [
+                    "permitNumber", "receipt", "actionDate", "actionName",
+                    "actionComment", "permitStatus", "wellName"
+                ]
+                action_cols = [c for c in preferred_action_cols if c in actions_df.columns]
+                st.dataframe(actions_df[action_cols] if action_cols else actions_df, use_container_width=True, height=260)
+    except Exception as e:
+        st.caption(f"Action history not loaded: {e}")
+else:
+    st.info("Enter a permit number, receipt number, or county to preview well permit records. The API links above update as you type.")
+
 
 st.markdown("### 30-Day Water Rights Outlook")
 
