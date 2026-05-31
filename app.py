@@ -1320,12 +1320,6 @@ def get_model_row_for_date(model_df, selected_date):
 
 st.sidebar.title("Scenario")
 
-st.markdown("""
-<style>
-.beta-meta, .beta-pill { display: none !important; }
-</style>
-""", unsafe_allow_html=True)
-
 use_live_dashboard = True
 date_choice = st.sidebar.date_input(
     "Choose a historical date",
@@ -1376,10 +1370,7 @@ st.markdown(f"""
   <div class="eyebrow">Historical-data prototype</div>
   <h1>Water Right Outlook</h1>
   <p>Making Colorado water rights understandable — by translating river administration into a plain-English outlook.</p>
-  <div class="hero-footer">
-    <div class="small-muted">Selected date: {selected_date.strftime("%B %d, %Y")} · South Platte / Poudre framework</div>
-    <div class="badge">Current condition: {public_label}</div>
-  </div>
+</div>
 </div>
 """, unsafe_allow_html=True)
 

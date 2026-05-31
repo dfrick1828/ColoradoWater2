@@ -93,3 +93,8 @@ Removed the user option to disable live CDSS data. The dashboard now always atte
 
 - Removed pill/bubble UI chips above dashboard data.
 - Active/current call priority date is formatted as MM/DD/YYYY.
+
+
+## Latest change
+
+Removed/suppressed remaining long horizontal divider/bubble elements above the dashboard data, including hero-footer, badge, pill, status-pill, and metric-row elements.
