@@ -103,3 +103,8 @@ Removed/suppressed remaining long horizontal divider/bubble elements above the d
 ## Latest change
 
 Removed the rounded top snapshot cards/bubbles above the dashboard data and replaced them with a flat text-based Current Water Right Snapshot.
+
+
+## Rebuilt no-bubbles version
+
+Rebuilt the app to remove the decorative rounded horizontal capsule/divider elements from the metric sections. Metrics are now rendered as flat text in columns. Live CDSS remains always on, and call dates remain formatted as MM/DD/YYYY.

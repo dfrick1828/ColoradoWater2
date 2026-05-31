@@ -1322,6 +1322,45 @@ st.sidebar.title("Scenario")
 
 st.markdown("""
 <style>
+/* Final cleanup: remove decorative long rounded dividers/capsules */
+.metric-row,
+.pill,
+.beta-pill,
+.beta-meta,
+.status-pill,
+.badge,
+.capsule,
+.stat-bar,
+.metric-bar,
+.metric-top,
+.metric-header,
+.hero-footer {
+    display: none !important;
+}
+
+/* Prevent empty markdown blocks/divs from becoming visible rounded bars */
+div:empty {
+    display: none !important;
+}
+
+/* Keep metric columns flat */
+[data-testid="column"] > div {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* But keep Plotly charts visible */
+.js-plotly-plot,
+.plotly,
+[data-testid="stPlotlyChart"] {
+    display: block !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<style>
 /* Flatten the top snapshot area: no rounded horizontal bubble cards above data */
 [data-testid="column"] > div:has(> div > div > p) {
     background: transparent !important;
@@ -1463,32 +1502,31 @@ with right:
     st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown("")
+
+st.markdown("### Current Call and Hydrology")
+
 m1, m2, m3, m4 = st.columns(4)
 with m1:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="kicker">Current call signal</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="big" style="font-size:26px;">{priority}</div>', unsafe_allow_html=True)
+    st.markdown('<div class="kicker">Current Call Signal</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="big" style="font-size:30px;">{priority}</div>', unsafe_allow_html=True)
     st.markdown(f'<div class="copy">{structure}</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+
 with m2:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="kicker">Canyon-mouth flow</div>', unsafe_allow_html=True)
+    st.markdown('<div class="kicker">Canyon-Mouth Flow</div>', unsafe_allow_html=True)
     st.markdown(f'<div class="big" style="font-size:30px;">{flow_cfs:,.0f} cfs</div>', unsafe_allow_html=True)
     st.markdown(f'<div class="copy">Seasonal flow percentile: {flow_pct:.0f}%</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+
 with m3:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="kicker">Comparable years</div>', unsafe_allow_html=True)
+    st.markdown('<div class="kicker">Comparable Years</div>', unsafe_allow_html=True)
     st.markdown(f'<div class="big" style="font-size:30px;">{", ".join(comps) if comps else "—"}</div>', unsafe_allow_html=True)
     st.markdown('<div class="copy">Based on recent administrative severity near this point in the season.</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+
 with m4:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="kicker">Severity score</div>', unsafe_allow_html=True)
+    st.markdown('<div class="kicker">Severity Score</div>', unsafe_allow_html=True)
     st.markdown(f'<div class="big" style="font-size:30px;">{score:.0f}/100</div>', unsafe_allow_html=True)
     st.markdown('<div class="copy">Higher means more restrictive water-right administration.</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
 
+st.markdown("<br>", unsafe_allow_html=True)
 
 st.markdown("### 30-Day Water Rights Outlook")
 
