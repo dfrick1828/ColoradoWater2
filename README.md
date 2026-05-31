@@ -132,17 +132,9 @@ Simplified the top of the dashboard to three primary public-facing metrics:
 Flow, comparable years, and severity score were moved into a secondary Supporting Hydrology and Context section.
 
 
-## Latest change
+## Clean rebuild
 
-Replaced the hero background with a local Cache la Poudre River canyon image stored at `assets/poudre_river_hero.jpg`.
-
-
-## Latest change
-
-- Removed Severity Score from the dashboard.
-- Replaced flow percentile with percent of average flow for the selected/current date based on historical records for the same day of year.
-
-
-## Latest fix
-
-Replaced the inline Streamlit conditional for percent-of-average flow with a normal if/else block so Streamlit does not render a DeltaGenerator object.
+Rebuilt from the stable simplified-top-metrics version.
+- Removed Severity Score.
+- Replaced flow percentile with percent of average for the same day of year.
+- Fixed Streamlit/indentation issue by using a proper if/else block inside the flow column.
