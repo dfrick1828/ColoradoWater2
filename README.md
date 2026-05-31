@@ -164,10 +164,6 @@ The search sections are rendered directly in the dashboard, not through hidden/n
 ## Latest fix
 Added missing `import re` for decree case normalization and confirmed syntax compiles.
 
-## Latest change
+## Latest fix
 
-Cleaned up the API UX:
-- Added a single Records Search section with tabs for Water Court Decrees and Well Permits.
-- Searches run only after clicking a button.
-- Raw REST URLs are hidden under Advanced / API details.
-- Public-facing results are shown first.
+Rebuilt the Records Search section from a stable source and validated the full Python file with `ast.parse()` and `compile()`. Searches now run only after button click, and raw API details are hidden under expanders.

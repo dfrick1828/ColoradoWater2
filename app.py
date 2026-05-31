@@ -1717,11 +1717,10 @@ st.markdown("<br>", unsafe_allow_html=True)
 
 
 st.markdown("### Records Search")
-
 search_tab_decree, search_tab_well = st.tabs(["Water Court Decrees", "Well Permits"])
 
 with search_tab_decree:
-    st.caption("Search water court decree metadata by case number and Water Division. Raw API links are kept under Advanced details.")
+    st.caption("Search decree metadata by case number and Water Division. API links are under Advanced details.")
 
     dc1, dc2, dc3 = st.columns([0.46, 0.26, 0.28])
     with dc1:
@@ -1742,15 +1741,16 @@ with search_tab_decree:
     with dc3:
         st.write("")
         st.write("")
-        run_decree_search = st.button("Search Decree", use_container_width=True, key="run_decree_search_clean")
+        run_decree_search = st.button(
+            "Search Decree",
+            use_container_width=True,
+            key="run_decree_search_clean",
+        )
 
     cdss_case_clean = normalize_decree_case_for_cdss(decree_case_input_clean)
     laserfiche_case_clean = normalize_decree_case_for_laserfiche(decree_case_input_clean)
 
-    st.markdown(
-        f"<div class='copy'>Search formats: CDSS <b>{cdss_case_clean}</b> · Imaged Records <b>{laserfiche_case_clean}</b></div>",
-        unsafe_allow_html=True,
-    )
+    st.caption(f"Search formats: CDSS {cdss_case_clean} · Imaged Records {laserfiche_case_clean}")
 
     if run_decree_search:
         try:
@@ -1762,12 +1762,14 @@ with search_tab_decree:
             if decree_tx_clean.empty:
                 st.warning("No CDSS transaction metadata returned for this case and division.")
             else:
-                st.success(f"Found {len(decree_tx_clean):,} transaction record(s) for {cdss_case_clean} in Division {decree_division_clean}.")
-
+                st.success(
+                    f"Found {len(decree_tx_clean):,} transaction record(s) for {cdss_case_clean} "
+                    f"in Division {decree_division_clean}."
+                )
                 preferred_decree_cols = [
                     "caseNumber", "caseNumberUrl", "wdid", "structureName", "waterDistrict",
                     "waterSource", "appropriationDate", "signatureDate", "adminNumber",
-                    "decreedUses", "maxDecreedRate", "maxDecreedVolume"
+                    "decreedUses", "maxDecreedRate", "maxDecreedVolume",
                 ]
                 decree_cols = [c for c in preferred_decree_cols if c in decree_tx_clean.columns]
                 st.dataframe(
@@ -1790,23 +1792,23 @@ with search_tab_decree:
                 st.markdown("**CDSS transaction API**")
                 st.code(decree_request_url_clean)
                 st.markdown("**DWR imaged records**")
-                st.markdown("[Open DWR Imaged Records](https://dnrweblink.state.co.us/dwr/)")
+                st.markdown("Open DWR Imaged Records: https://dnrweblink.state.co.us/dwr/")
                 st.markdown(
-                    f"Search path: Water Court → Division {decree_division_clean} → Case Number `{laserfiche_case_clean}`"
+                    f"Search path: Water Court → Division {decree_division_clean} → "
+                    f"Case Number `{laserfiche_case_clean}`"
                 )
-                st.markdown("[DWR Records Help](https://dwr.colorado.gov/services/records-research)")
+                st.markdown("DWR Records Help: https://dwr.colorado.gov/services/records-research")
 
         except Exception as e:
             st.warning(f"Could not fetch decree metadata: {e}")
             with st.expander("Advanced / API details"):
                 st.code(cdss_decree_transaction_url(cdss_case_clean, decree_division_clean))
-                st.markdown("[Open DWR Imaged Records](https://dnrweblink.state.co.us/dwr/)")
-
+                st.markdown("Open DWR Imaged Records: https://dnrweblink.state.co.us/dwr/")
     else:
         st.info("Enter a case number and Water Division, then click Search Decree.")
 
 with search_tab_well:
-    st.caption("Search CDSS well permits. Raw REST endpoints are kept under Advanced details.")
+    st.caption("Search CDSS well permits. API links are under Advanced details.")
 
     w1, w2, w3, w4 = st.columns([0.34, 0.24, 0.22, 0.20])
     with w1:
@@ -1833,7 +1835,11 @@ with search_tab_well:
     with w4:
         st.write("")
         st.write("")
-        run_well_search = st.button("Search Permit", use_container_width=True, key="run_well_search_clean")
+        run_well_search = st.button(
+            "Search Permit",
+            use_container_width=True,
+            key="run_well_search_clean",
+        )
 
     permit_norm_clean = normalize_well_permit_number(permit_input_clean)
 
@@ -1856,13 +1862,20 @@ with search_tab_well:
                         "permitNumber", "receipt", "wellName", "county", "division", "waterDistrict",
                         "managementDistrict", "designatedBasin", "permitStatus", "permitType",
                         "use", "totalDepth", "staticWaterLevel", "latitude", "longitude",
-                        "dateIssued", "dateCompleted", "parcelName"
+                        "dateIssued", "dateCompleted", "parcelName",
                     ]
                     cols = [c for c in preferred_cols if c in permits_df_clean.columns]
-                    st.dataframe(permits_df_clean[cols] if cols else permits_df_clean, use_container_width=True, height=260)
+                    st.dataframe(
+                        permits_df_clean[cols] if cols else permits_df_clean,
+                        use_container_width=True,
+                        height=260,
+                    )
 
                 actions_df_clean = pd.DataFrame()
-                action_url_clean = cdss_well_permit_action_rest_url(permit_norm_clean, receipt_input_clean)
+                action_url_clean = cdss_well_permit_action_rest_url(
+                    permit_norm_clean,
+                    receipt_input_clean,
+                )
                 try:
                     actions_df_clean, action_url_clean = fetch_well_permit_actions_direct(
                         permit_norm_clean,
@@ -1875,10 +1888,14 @@ with search_tab_well:
                     with st.expander("Permit action history"):
                         preferred_action_cols = [
                             "permitNumber", "receipt", "actionDate", "actionName",
-                            "actionComment", "permitStatus", "wellName"
+                            "actionComment", "permitStatus", "wellName",
                         ]
                         action_cols = [c for c in preferred_action_cols if c in actions_df_clean.columns]
-                        st.dataframe(actions_df_clean[action_cols] if action_cols else actions_df_clean, use_container_width=True, height=260)
+                        st.dataframe(
+                            actions_df_clean[action_cols] if action_cols else actions_df_clean,
+                            use_container_width=True,
+                            height=260,
+                        )
 
                 with st.expander("Advanced / API details"):
                     st.markdown("**Well permit API**")
@@ -1889,8 +1906,19 @@ with search_tab_well:
             except Exception as e:
                 st.warning(f"Could not fetch well permit records from CDSS: {e}")
                 with st.expander("Advanced / API details"):
-                    st.code(cdss_well_permit_rest_url(permit_norm_clean, receipt_input_clean, county_input_clean))
-                    st.code(cdss_well_permit_action_rest_url(permit_norm_clean, receipt_input_clean))
+                    st.code(
+                        cdss_well_permit_rest_url(
+                            permit_norm_clean,
+                            receipt_input_clean,
+                            county_input_clean,
+                        )
+                    )
+                    st.code(
+                        cdss_well_permit_action_rest_url(
+                            permit_norm_clean,
+                            receipt_input_clean,
+                        )
+                    )
     else:
         st.info("Enter a permit number, receipt number, or county, then click Search Permit.")
 
