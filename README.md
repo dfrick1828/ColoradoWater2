@@ -142,3 +142,8 @@ Rebuilt from the stable simplified-top-metrics version.
 
 ## Rebrand
 Renamed application to Water Outlook and added explanatory footnote.
+
+
+## Latest change
+
+Replaced fragile CSS background image with a reliable Streamlit `st.image()` call using `assets/poudre_river_hero.jpg`.

@@ -314,18 +314,12 @@ st.markdown("""
 .block-container { padding-top: 1.7rem; padding-bottom: 3rem; max-width: 1220px; }
 
 .hero {
-  min-height: 440px;
   border: 1px solid rgba(255,255,255,.13);
-  border-radius: 34px;
-  padding: 42px;
-  background:
-    linear-gradient(90deg, rgba(4,12,18,.97), rgba(4,12,18,.74), rgba(4,12,18,.28)),
-    url('assets/poudre_river_hero.jpg');
-  background-size: cover;
-  background-position: center;
-  box-shadow: 0 35px 110px rgba(0,0,0,.42);
-  margin-bottom: 26px;
-  position: relative;
+  border-radius: 28px;
+  padding: 30px;
+  background: linear-gradient(180deg, rgba(255,255,255,.065), rgba(255,255,255,.025));
+  box-shadow: 0 20px 70px rgba(0,0,0,.30);
+  margin-bottom: 22px;
 }
 .eyebrow {
   color: #5ec9df;
@@ -1446,6 +1440,10 @@ public_label = PUBLIC_LABELS[current_regime]
 public_explain = PUBLIC_EXPLAIN[current_regime]
 most_likely = prob_series.index[0]
 most_likely_public = PUBLIC_LABELS[most_likely]
+
+
+if Path("assets/poudre_river_hero.jpg").exists():
+    st.image("assets/poudre_river_hero.jpg", use_container_width=True)
 
 st.markdown(f"""
 <div class="hero">
