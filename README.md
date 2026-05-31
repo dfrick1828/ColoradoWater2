@@ -167,3 +167,12 @@ Added missing `import re` for decree case normalization and confirmed syntax com
 ## Latest fix
 
 Rebuilt the Records Search section from a stable source and validated the full Python file with `ast.parse()` and `compile()`. Searches now run only after button click, and raw API details are hidden under expanders.
+
+## Latest fix
+
+Removed raw `caseNumberUrl` output from the decree search. The app now provides clean buttons:
+- Open Decree Search
+- Open CDSS Metadata
+- Open Records Help
+
+This avoids dumping malformed/duplicative Laserfiche search-command URLs into the UI.

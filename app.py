@@ -1375,6 +1375,17 @@ def normalize_decree_case_for_laserfiche(case_number):
     return s
 
 
+
+def dwr_laserfiche_case_search_url(case_number, division):
+    """
+    Build a direct DWR Laserfiche search URL for a Water Court case.
+    This is cleaner than displaying raw caseNumberUrl values returned by CDSS.
+    """
+    case = normalize_decree_case_for_laserfiche(case_number)
+    div = int(division)
+    search_command = f'{{[Water Court]:[case number]="{case}"&[Water Court]:[division]={div}}}'
+    return "https://dnrweblink.state.co.us/dwr/Search.aspx?searchcommand=" + quote_plus(search_command)
+
 def cdss_decree_transaction_url(case_number, division):
     case = normalize_decree_case_for_cdss(case_number)
     return (
@@ -1752,6 +1763,26 @@ with search_tab_decree:
 
     st.caption(f"Search formats: CDSS {cdss_case_clean} · Imaged Records {laserfiche_case_clean}")
 
+    link_decree_1, link_decree_2, link_decree_3 = st.columns(3)
+    with link_decree_1:
+        st.link_button(
+            "Open Decree Search",
+            dwr_laserfiche_case_search_url(cdss_case_clean, decree_division_clean),
+            use_container_width=True,
+        )
+    with link_decree_2:
+        st.link_button(
+            "Open CDSS Metadata",
+            cdss_decree_transaction_url(cdss_case_clean, decree_division_clean),
+            use_container_width=True,
+        )
+    with link_decree_3:
+        st.link_button(
+            "Open Records Help",
+            "https://dwr.colorado.gov/services/records-research",
+            use_container_width=True,
+        )
+
     if run_decree_search:
         try:
             decree_tx_clean, decree_request_url_clean = fetch_decree_transactions_direct(
@@ -1778,21 +1809,12 @@ with search_tab_decree:
                     height=260,
                 )
 
-                if "caseNumberUrl" in decree_tx_clean.columns:
-                    decree_urls = [
-                        u for u in decree_tx_clean["caseNumberUrl"].dropna().astype(str).unique()
-                        if u and u.lower() != "nan"
-                    ]
-                    if decree_urls:
-                        st.markdown("**Case links returned by CDSS:**")
-                        for i, u in enumerate(decree_urls[:5], start=1):
-                            st.markdown(f"{i}. [{u}]({u})")
 
             with st.expander("Advanced / API details"):
                 st.markdown("**CDSS transaction API**")
                 st.code(decree_request_url_clean)
                 st.markdown("**DWR imaged records**")
-                st.markdown("Open DWR Imaged Records: https://dnrweblink.state.co.us/dwr/")
+                st.markdown(f"Open Decree Search: {dwr_laserfiche_case_search_url(cdss_case_clean, decree_division_clean)}")
                 st.markdown(
                     f"Search path: Water Court → Division {decree_division_clean} → "
                     f"Case Number `{laserfiche_case_clean}`"
@@ -1803,7 +1825,7 @@ with search_tab_decree:
             st.warning(f"Could not fetch decree metadata: {e}")
             with st.expander("Advanced / API details"):
                 st.code(cdss_decree_transaction_url(cdss_case_clean, decree_division_clean))
-                st.markdown("Open DWR Imaged Records: https://dnrweblink.state.co.us/dwr/")
+                st.markdown(f"Open Decree Search: {dwr_laserfiche_case_search_url(cdss_case_clean, decree_division_clean)}")
     else:
         st.info("Enter a case number and Water Division, then click Search Decree.")
 
