@@ -1317,13 +1317,8 @@ date_choice = st.sidebar.date_input(
 )
 selected_date = pd.Timestamp(date_choice)
 
-st.markdown("""
-<div class="hero">
-  <div class="eyebrow">Water Right Outlook</div>
-  <h1>Water Right Outlook</h1>
-  <p>Understanding water-right administration today and what may happen next.</p>
-</div>
-""", unsafe_allow_html=True)
+
+
 
 row = get_model_row_for_date(model_df, selected_date)
 
