@@ -120,3 +120,13 @@ Rebuilt the app to remove the decorative rounded horizontal capsule/divider elem
   - Senior Calls Dominating
 - Removed the stochastic hydrology section.
 - Rebuilt the Annual Regime History chart as a single uniquely-keyed Plotly chart to avoid StreamlitDuplicateElementId errors.
+
+
+## Latest change
+
+Simplified the top of the dashboard to three primary public-facing metrics:
+1. Current Condition
+2. Current Call
+3. 30-Day Outlook
+
+Flow, comparable years, and severity score were moved into a secondary Supporting Hydrology and Context section.

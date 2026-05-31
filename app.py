@@ -1428,36 +1428,36 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 
+
 st.markdown("### Current Water Right Snapshot")
 
-snap1, snap2, snap3 = st.columns(3)
-with snap1:
-    st.markdown("**Today’s condition**")
+top1, top2, top3 = st.columns(3)
+
+with top1:
+    st.markdown('<div class="kicker">Current Condition</div>', unsafe_allow_html=True)
     st.markdown(
-        f"<span style='font-size:28px;font-weight:850;color:{REGIME_COLORS[current_regime]};'>{public_label}</span>",
+        f'<div class="big" style="color:{REGIME_COLORS[current_regime]};">{public_label}</div>',
         unsafe_allow_html=True,
     )
-    st.caption(public_explain)
+    st.markdown(f'<div class="copy">{public_explain}</div>', unsafe_allow_html=True)
 
-with snap2:
-    st.markdown("**Same-day call depth**")
+with top2:
+    st.markdown('<div class="kicker">Current Call</div>', unsafe_allow_html=True)
     st.markdown(
-        f"<span style='font-size:28px;font-weight:850;color:#f3f7f9;'>{hist_pct:.0f}th percentile</span>",
+        f'<div class="big" style="font-size:32px;">{priority}</div>',
         unsafe_allow_html=True,
     )
-    st.caption("Compared with historical conditions for this same day of year.")
+    st.markdown(f'<div class="copy">{structure}</div>', unsafe_allow_html=True)
 
-with snap3:
-    st.markdown("**30-day outlook**")
+with top3:
+    st.markdown('<div class="kicker">30-Day Outlook</div>', unsafe_allow_html=True)
     st.markdown(
-        f"<span style='font-size:28px;font-weight:850;color:{REGIME_COLORS[most_likely]};'>{most_likely_public}</span>",
+        f'<div class="big" style="color:{REGIME_COLORS[most_likely]};">{most_likely_public}</div>',
         unsafe_allow_html=True,
     )
-    st.caption(f"Most likely outcome: {prob_series.iloc[0]:.0%} probability.")
+    st.markdown(f'<div class="copy">Most likely outcome: {prob_series.iloc[0]:.0%} probability.</div>', unsafe_allow_html=True)
 
-st.markdown("<hr style='border:0;border-top:1px solid rgba(255,255,255,.10);margin:18px 0 22px;'>", unsafe_allow_html=True)
-
-st.markdown("")
+st.markdown("<br>", unsafe_allow_html=True)
 
 left, right = st.columns([1.08, .92], gap="large")
 with left:
@@ -1491,7 +1491,7 @@ with left:
 
 with right:
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="section-title">What does this mean?</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title"></div>', unsafe_allow_html=True)
     st.markdown(f"""
     <div class="meaning-grid" style="grid-template-columns:1fr;">
       <div class="meaning-card"><strong>For the public</strong><br><span class="copy">This is like a water-right outlook: not just how much water is in the river, but how the river is being administered.</span></div>
@@ -1503,25 +1503,22 @@ with right:
 
 st.markdown("")
 
-st.markdown("### Current Call and Hydrology")
 
-m1, m2, m3, m4 = st.columns(4)
-with m1:
-    st.markdown('<div class="kicker">Current Call Signal</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="big" style="font-size:30px;">{priority}</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="copy">{structure}</div>', unsafe_allow_html=True)
+st.markdown("### Supporting Hydrology and Context")
 
-with m2:
+h1, h2, h3 = st.columns(3)
+
+with h1:
     st.markdown('<div class="kicker">Canyon-Mouth Flow</div>', unsafe_allow_html=True)
     st.markdown(f'<div class="big" style="font-size:30px;">{flow_cfs:,.0f} cfs</div>', unsafe_allow_html=True)
     st.markdown(f'<div class="copy">Seasonal flow percentile: {flow_pct:.0f}%</div>', unsafe_allow_html=True)
 
-with m3:
+with h2:
     st.markdown('<div class="kicker">Comparable Years</div>', unsafe_allow_html=True)
     st.markdown(f'<div class="big" style="font-size:30px;">{", ".join(comps) if comps else "—"}</div>', unsafe_allow_html=True)
     st.markdown('<div class="copy">Based on recent administrative severity near this point in the season.</div>', unsafe_allow_html=True)
 
-with m4:
+with h3:
     st.markdown('<div class="kicker">Severity Score</div>', unsafe_allow_html=True)
     st.markdown(f'<div class="big" style="font-size:30px;">{score:.0f}/100</div>', unsafe_allow_html=True)
     st.markdown('<div class="copy">Higher means more restrictive water-right administration.</div>', unsafe_allow_html=True)
