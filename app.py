@@ -320,7 +320,7 @@ st.markdown("""
   padding: 42px;
   background:
     linear-gradient(90deg, rgba(4,12,18,.97), rgba(4,12,18,.74), rgba(4,12,18,.28)),
-    url('https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1800&q=80');
+    url('assets/poudre_river_hero.jpg');
   background-size: cover;
   background-position: center;
   box-shadow: 0 35px 110px rgba(0,0,0,.42);
@@ -1451,7 +1451,7 @@ st.markdown(f"""
 <div class="hero">
   <div class="eyebrow">Historical-data prototype</div>
   <h1>Water Outlook</h1>
-  <p>Making Colorado water rights understandable — by translating river administration into a plain-English outlook.</p>
+  <p></p>
 </div>
 </div>
 """, unsafe_allow_html=True)
