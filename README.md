@@ -176,3 +176,7 @@ Removed raw `caseNumberUrl` output from the decree search. The app now provides 
 - Open Records Help
 
 This avoids dumping malformed/duplicative Laserfiche search-command URLs into the UI.
+
+
+## Latest fix
+Converted search-section text and URL construction to ASCII-safe strings to avoid unrecognized character errors.

@@ -138,10 +138,10 @@ def format_call_date_mmddyyyy(value):
     try:
         ts = parse_cdss_date(value) if "parse_cdss_date" in globals() else pd.to_datetime(value, errors="coerce")
         if pd.isna(ts):
-            return "—"
+            return "-"
         return pd.Timestamp(ts).strftime("%m/%d/%Y")
     except Exception:
-        return "—"
+        return "-"
 
 def cdss_get_json(endpoint, params=None):
     params = dict(params or {})
@@ -230,9 +230,9 @@ def build_live_current_state(live_calls):
             "score": 0,
             "historical_percentile": 0,
             "controlling_wd": None,
-            "controlling_priority_date": "—",
-            "controlling_priority_structure": "—",
-            "controlling_water_source": "—",
+            "controlling_priority_date": "-",
+            "controlling_priority_structure": "-",
+            "controlling_water_source": "-",
             "data_source": "Live CDSS active calls",
         }
 
@@ -278,9 +278,9 @@ def build_live_current_state(live_calls):
         "score": int(top["score"]),
         "historical_percentile": None,
         "controlling_wd": int(top["wd"]) if pd.notna(top.get("wd")) else None,
-        "controlling_priority_date": format_call_date_mmddyyyy(top.get("Priority Date", "—")),
-        "controlling_priority_structure": str(top.get("Priority Structure Name", "—")),
-        "controlling_water_source": str(top.get("Water Source", "—")),
+        "controlling_priority_date": format_call_date_mmddyyyy(top.get("Priority Date", "-")),
+        "controlling_priority_structure": str(top.get("Priority Structure Name", "-")),
+        "controlling_water_source": str(top.get("Water Source", "-")),
         "data_source": "Live CDSS active calls",
     }
 
@@ -1379,11 +1379,11 @@ def normalize_decree_case_for_laserfiche(case_number):
 def dwr_laserfiche_case_search_url(case_number, division):
     """
     Build a direct DWR Laserfiche search URL for a Water Court case.
-    This is cleaner than displaying raw caseNumberUrl values returned by CDSS.
+    Uses ASCII-only search command text.
     """
     case = normalize_decree_case_for_laserfiche(case_number)
     div = int(division)
-    search_command = f'{{[Water Court]:[case number]="{case}"&[Water Court]:[division]={div}}}'
+    search_command = "{[Water Court]:[case number]=\"" + case + "\"&[Water Court]:[division]=" + str(div) + "}"
     return "https://dnrweblink.state.co.us/dwr/Search.aspx?searchcommand=" + quote_plus(search_command)
 
 def cdss_decree_transaction_url(case_number, division):
@@ -1596,8 +1596,8 @@ if use_live_dashboard:
 
 hist_pct = float(row.iloc[0]["historical_percentile"])
 score = float(row.iloc[0]["score"])
-priority = format_call_date_mmddyyyy(row.iloc[0].get("controlling_priority_date", "—"))
-structure = row.iloc[0].get("controlling_priority_structure", "—")
+priority = format_call_date_mmddyyyy(row.iloc[0].get("controlling_priority_date", "-"))
+structure = row.iloc[0].get("controlling_priority_structure", "-")
 flow_cfs = float(row.iloc[0].get("flow_cfs", np.nan))
 flow_pct_avg = percent_of_average_flow(flow_cfs, model_df, selected_date)
 
@@ -1720,7 +1720,7 @@ with h1:
 
 with h2:
     st.markdown('<div class="kicker">Comparable Years</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="big" style="font-size:30px;">{", ".join(comps) if comps else "—"}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="big" style="font-size:30px;">{", ".join(comps) if comps else "-"}</div>', unsafe_allow_html=True)
     st.markdown('<div class="copy">Based on recent administrative severity near this point in the season.</div>', unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
@@ -1761,7 +1761,7 @@ with search_tab_decree:
     cdss_case_clean = normalize_decree_case_for_cdss(decree_case_input_clean)
     laserfiche_case_clean = normalize_decree_case_for_laserfiche(decree_case_input_clean)
 
-    st.caption(f"Search formats: CDSS {cdss_case_clean} · Imaged Records {laserfiche_case_clean}")
+    st.caption(f"Search formats: CDSS {cdss_case_clean} - Imaged Records {laserfiche_case_clean}")
 
     link_decree_1, link_decree_2, link_decree_3 = st.columns(3)
     with link_decree_1:
@@ -1816,7 +1816,7 @@ with search_tab_decree:
                 st.markdown("**DWR imaged records**")
                 st.markdown(f"Open Decree Search: {dwr_laserfiche_case_search_url(cdss_case_clean, decree_division_clean)}")
                 st.markdown(
-                    f"Search path: Water Court → Division {decree_division_clean} → "
+                    f"Search path: Water Court / Division {decree_division_clean} -> "
                     f"Case Number `{laserfiche_case_clean}`"
                 )
                 st.markdown("DWR Records Help: https://dwr.colorado.gov/services/records-research")
@@ -2017,7 +2017,7 @@ with c_out2:
 
 
 
-st.markdown("### Annual regime history: 2005–present")
+st.markdown("### Annual regime history: 2005-present")
 annual = annual.rename(columns={annual.columns[0]: "year"}) if annual.columns[0] != "year" else annual
 plot_annual = annual[annual["year"] >= 2005].copy()
 
