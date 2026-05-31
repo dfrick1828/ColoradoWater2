@@ -1,5 +1,6 @@
 
 import os
+from urllib.parse import quote_plus
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
@@ -1340,6 +1341,149 @@ def get_model_row_for_date(model_df, selected_date):
     if not same_doy.empty:
         return same_doy.sort_values("date").iloc[[-1]]
     return model_df.sort_values("date").iloc[[-1]]
+
+
+# -----------------------------
+# Water court case link engine
+# -----------------------------
+def normalize_water_court_case(case_number: str) -> str:
+    """
+    Normalize user-entered water court case numbers to a CDSS-friendly form.
+
+    Examples:
+    - 03CW099 -> 03CW099
+    - 03CW99  -> 03CW099
+    - 2003CW099 -> 03CW099
+    - 03 CW 99 -> 03CW099
+    """
+    if case_number is None:
+        return ""
+    s = str(case_number).strip().upper()
+    s = re.sub(r"[^0-9A-Z]", "", s)
+
+    m = re.match(r"^(?:20)?(\d{2})CW0*(\d+)$", s)
+    if m:
+        yy, num = m.groups()
+        return f"{yy}CW{int(num):03d}"
+
+    m = re.match(r"^(\d{4})CW0*(\d+)$", s)
+    if m:
+        yyyy, num = m.groups()
+        return f"{yyyy[-2:]}CW{int(num):03d}"
+
+    return s
+
+
+def cdss_case_search_url(case_number: str) -> str:
+    """
+    Link to CDSS Water Rights Transactions filtered by case number.
+    This uses the public CDSS water-rights transaction tool.
+    """
+    case = normalize_water_court_case(case_number)
+    return f"https://dwr.state.co.us/Tools/WaterRights/Transactions?caseNumber={quote_plus(case)}"
+
+
+def cdss_case_rest_url(case_number: str, water_district: int | None = None) -> str:
+    """
+    REST query for transaction/decree metadata by case number.
+    """
+    case = normalize_water_court_case(case_number)
+    url = f"https://dwr.state.co.us/Rest/GET/api/v2/waterrights/transaction?caseNumber={quote_plus(case)}&format=json&pageSize=500000"
+    if water_district is not None:
+        url += f"&waterDistrict={int(water_district)}"
+    return url
+
+
+@st.cache_data(ttl=60 * 60, show_spinner=False)
+def fetch_case_transactions(case_number: str, water_district: int | None = None) -> tuple[pd.DataFrame, str]:
+    """
+    Fetch water-right transaction/decree metadata for a water court case.
+    """
+    case = normalize_water_court_case(case_number)
+    params = {
+        "caseNumber": case,
+        "format": "json",
+        "pageSize": "500000",
+    }
+    if water_district is not None:
+        params["waterDistrict"] = int(water_district)
+
+    headers = {}
+    try:
+        api_key = st.secrets.get("CDSS_API_KEY", "")
+        if api_key:
+            headers["ApiKey"] = api_key
+    except Exception:
+        pass
+
+    url = "https://dwr.state.co.us/Rest/GET/api/v2/waterrights/transaction"
+    r = requests.get(url, params=params, headers=headers, timeout=35)
+    r.raise_for_status()
+    data = r.json()
+
+    if isinstance(data, dict) and "ResultList" in data:
+        rows = data["ResultList"]
+    elif isinstance(data, list):
+        rows = data
+    else:
+        rows = []
+
+    return pd.DataFrame(rows), r.url
+
+
+def render_case_link_engine():
+    st.markdown("### Water Court Case Link")
+    st.caption("Enter a case number to open CDSS transaction records and preview the associated water-right transaction metadata.")
+
+    case_col, wd_col = st.columns([0.72, 0.28])
+    with case_col:
+        case_input = st.text_input("Case number", value="03CW099", placeholder="Example: 03CW099")
+    with wd_col:
+        district_input = st.text_input("Optional water district", value="", placeholder="3")
+
+    normalized_case = normalize_water_court_case(case_input)
+    district_value = None
+    if district_input.strip():
+        try:
+            district_value = int(district_input.strip())
+        except Exception:
+            district_value = None
+
+    link_col1, link_col2 = st.columns(2)
+    with link_col1:
+        st.link_button("Open CDSS Case Search", cdss_case_search_url(normalized_case), use_container_width=True)
+    with link_col2:
+        st.link_button("Open REST JSON", cdss_case_rest_url(normalized_case, district_value), use_container_width=True)
+
+    try:
+        tx, request_url = fetch_case_transactions(normalized_case, district_value)
+        st.caption(f"REST request: {request_url}")
+
+        if tx.empty:
+            st.warning("No CDSS transaction records returned for this case number. The decree may exist outside this endpoint, the case number may be formatted differently, or the document/OCR endpoint may be separate.")
+        else:
+            st.success(f"Found {len(tx):,} transaction record(s) for {normalized_case}.")
+            preferred_cols = [
+                "caseNumber", "caseNumberUrl", "wdid", "structureName", "waterDistrict",
+                "waterSource", "appropriationDate", "signatureDate", "adminNumber",
+                "decreedUses", "maxDecreedRate", "maxDecreedVolume"
+            ]
+            cols = [c for c in preferred_cols if c in tx.columns]
+            if cols:
+                st.dataframe(tx[cols], use_container_width=True, height=260)
+            else:
+                st.dataframe(tx, use_container_width=True, height=260)
+
+            if "caseNumberUrl" in tx.columns:
+                urls = [u for u in tx["caseNumberUrl"].dropna().astype(str).unique() if u]
+                if urls:
+                    st.markdown("**Case document/link candidates returned by CDSS:**")
+                    for i, u in enumerate(urls[:10], start=1):
+                        st.markdown(f"{i}. [{u}]({u})")
+
+    except Exception as e:
+        st.warning(f"Could not fetch case transactions from CDSS: {e}")
+        st.caption("The direct CDSS and REST links above are still available.")
 
 st.sidebar.title("Scenario")
 

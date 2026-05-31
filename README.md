@@ -151,3 +151,15 @@ Replaced fragile CSS background image with a reliable Streamlit `st.image()` cal
 
 ## Latest change
 Poudre River image is embedded as a base64 CSS background behind the Water Outlook hero title.
+
+
+## Latest change
+
+Added a Water Court Case Link engine:
+- normalizes case numbers such as `03CW99` to `03CW099`;
+- provides a direct CDSS Water Rights Transactions link;
+- provides a direct REST JSON link;
+- previews returned CDSS transaction/decree metadata in the dashboard;
+- displays CDSS `caseNumberUrl` candidates when returned by the API.
+
+This does not yet ingest the full decree/OCR text; it creates direct linkage from the website to court case transaction records and any case URLs returned by CDSS.
