@@ -87,3 +87,9 @@ Removed the duplicate/second header from the dashboard build.
 ## Latest change
 
 Removed the user option to disable live CDSS data. The dashboard now always attempts to use live CDSS active calls. The historical data remains the model backbone and emergency fallback if CDSS is unavailable.
+
+
+## Latest change
+
+- Removed pill/bubble UI chips above dashboard data.
+- Active/current call priority date is formatted as MM/DD/YYYY.

@@ -103,6 +103,17 @@ def parse_cdss_date(value):
         except Exception:
             return pd.NaT
 
+
+def format_call_date_mmddyyyy(value):
+    """Format CDSS priority/call dates as MM/DD/YYYY for public display."""
+    try:
+        ts = parse_cdss_date(value) if "parse_cdss_date" in globals() else pd.to_datetime(value, errors="coerce")
+        if pd.isna(ts):
+            return "—"
+        return pd.Timestamp(ts).strftime("%m/%d/%Y")
+    except Exception:
+        return "—"
+
 def cdss_get_json(endpoint, params=None):
     params = dict(params or {})
     params.setdefault("format", "json")
@@ -238,7 +249,7 @@ def build_live_current_state(live_calls):
         "score": int(top["score"]),
         "historical_percentile": None,
         "controlling_wd": int(top["wd"]) if pd.notna(top.get("wd")) else None,
-        "controlling_priority_date": str(top.get("Priority Date", "—")),
+        "controlling_priority_date": format_call_date_mmddyyyy(top.get("Priority Date", "—")),
         "controlling_priority_structure": str(top.get("Priority Structure Name", "—")),
         "controlling_water_source": str(top.get("Water Source", "—")),
         "data_source": "Live CDSS active calls",
@@ -1308,7 +1319,13 @@ def get_model_row_for_date(model_df, selected_date):
     return model_df.sort_values("date").iloc[[-1]]
 
 st.sidebar.title("Scenario")
-st.sidebar.caption("Live CDSS active calls are always on.")
+
+st.markdown("""
+<style>
+.beta-meta, .beta-pill { display: none !important; }
+</style>
+""", unsafe_allow_html=True)
+
 use_live_dashboard = True
 date_choice = st.sidebar.date_input(
     "Choose a historical date",
@@ -1343,7 +1360,7 @@ if use_live_dashboard:
 
 hist_pct = float(row.iloc[0]["historical_percentile"])
 score = float(row.iloc[0]["score"])
-priority = row.iloc[0].get("controlling_priority_date", "—")
+priority = format_call_date_mmddyyyy(row.iloc[0].get("controlling_priority_date", "—"))
 structure = row.iloc[0].get("controlling_priority_structure", "—")
 flow_cfs = float(row.iloc[0].get("flow_cfs", np.nan))
 flow_pct = float(row.iloc[0].get("flow_doy_percentile", np.nan))
