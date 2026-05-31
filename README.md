@@ -108,3 +108,15 @@ Removed the rounded top snapshot cards/bubbles above the dashboard data and repl
 ## Rebuilt no-bubbles version
 
 Rebuilt the app to remove the decorative rounded horizontal capsule/divider elements from the metric sections. Metrics are now rendered as flat text in columns. Live CDSS remains always on, and call dates remain formatted as MM/DD/YYYY.
+
+
+## Latest change
+
+- Updated public regime labels:
+  - Free River
+  - Light Administration
+  - Active Administration
+  - Restrictive Administration
+  - Senior Calls Dominating
+- Removed the stochastic hydrology section.
+- Rebuilt the Annual Regime History chart as a single uniquely-keyed Plotly chart to avoid StreamlitDuplicateElementId errors.

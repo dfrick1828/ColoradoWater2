@@ -40,27 +40,27 @@ REGIME_COLORS = {
 }
 
 PUBLIC_LABELS = {
-    "Free River": "Water Readily Available",
-    "Mild Administration": "Minor Water-Right Pressure",
-    "Normal Administration": "Typical Summer Administration",
-    "Senior Administration": "Significant Water Stress",
-    "Exceptional Administration": "Exceptional Water Stress",
+    "Free River": "Free River",
+    "Mild Administration": "Light Administration",
+    "Normal Administration": "Active Administration",
+    "Senior Administration": "Restrictive Administration",
+    "Exceptional Administration": "Senior Calls Dominating",
 }
 
 PUBLIC_SHORT = {
-    "Free River": "Available",
-    "Mild Administration": "Minor Pressure",
-    "Normal Administration": "Typical Administration",
-    "Senior Administration": "Significant Stress",
-    "Exceptional Administration": "Exceptional Stress",
+    "Free River": "Free River",
+    "Mild Administration": "Light Administration",
+    "Normal Administration": "Active Administration",
+    "Senior Administration": "Restrictive Administration",
+    "Exceptional Administration": "Senior Calls Dominating",
 }
 
 PUBLIC_EXPLAIN = {
     "Free River": "Water-right calls are not currently controlling the basin in a meaningful way.",
-    "Mild Administration": "Water rights are being administered, but the current condition is relatively mild compared with historic stress periods.",
-    "Normal Administration": "The basin is operating under a normal seasonal water-right administration pattern.",
-    "Senior Administration": "Senior priorities are controlling the river system, indicating meaningful pressure on junior water rights.",
-    "Exceptional Administration": "Administration is unusually restrictive for this time of year and historically rare.",
+    "Mild Administration": "Calls are active, but administration is relatively light compared with historic stress periods.",
+    "Normal Administration": "Calls are active and water rights are being administered by priority.",
+    "Senior Administration": "Senior priorities are controlling the river system and junior water rights may experience limitations.",
+    "Exceptional Administration": "Senior calls are dominating the system and administration is unusually restrictive for this time of year.",
 }
 
 
@@ -1578,7 +1578,7 @@ with c_out1:
         plot_bgcolor="rgba(0,0,0,0)",
         font=dict(color="#edf4f7", size=14),
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True, key="thirty_day_probability_outlook")
 
 with c_out2:
     st.markdown('<div class="card">', unsafe_allow_html=True)
@@ -1599,20 +1599,23 @@ with c_out2:
 
 
 
+
 st.markdown("### Annual regime history: 2005–present")
 annual = annual.rename(columns={annual.columns[0]: "year"}) if annual.columns[0] != "year" else annual
 plot_annual = annual[annual["year"] >= 2005].copy()
-fig = go.Figure()
+
+fig_annual = go.Figure()
 for regime in REGIME_ORDER:
     if regime in plot_annual.columns:
-        fig.add_trace(go.Bar(
+        fig_annual.add_trace(go.Bar(
             x=plot_annual["year"].astype(str),
             y=plot_annual[regime],
             name=PUBLIC_SHORT[regime],
             marker_color=REGIME_COLORS[regime],
             hovertemplate=f"{PUBLIC_LABELS[regime]}<br>%{{y}} days<extra></extra>",
         ))
-fig.update_layout(
+
+fig_annual.update_layout(
     barmode="stack",
     height=450,
     margin=dict(l=10, r=10, t=20, b=10),
@@ -1623,113 +1626,7 @@ fig.update_layout(
     plot_bgcolor="rgba(0,0,0,0)",
     font=dict(color="#edf4f7"),
 )
-st.plotly_chart(fig, use_container_width=True)
-
-
-# -----------------------------
-# Stochastic hydrology and historical context
-# -----------------------------
-if all(name in globals() for name in ["model_df", "clf", "le", "row", "annual"]):
-    st.markdown("### Stochastic hydrology outlook")
-    st.caption("Fast Monte Carlo prototype using 150 simulated hydrology paths.")
-
-    try:
-        stoch_probs, hydro_model = simulate_stochastic_outlook(
-            model_df=model_df,
-            clf=clf,
-            le=le,
-            base_row=row.copy(),
-            n_sims=150,
-            horizons=(30, 60, 90),
-            seed=42,
-        )
-
-        c_stoch1, c_stoch2 = st.columns([0.68, 0.32], gap="large")
-
-        with c_stoch1:
-            fig = go.Figure()
-            for regime in REGIME_ORDER:
-                y_vals = []
-                for h in [30, 60, 90]:
-                    match = stoch_probs[
-                        (stoch_probs["horizon_days"] == h) &
-                        (stoch_probs["predicted_regime"] == regime)
-                    ]
-                    y_vals.append(float(match["probability"].iloc[0]) if not match.empty else 0.0)
-
-                fig.add_trace(go.Bar(
-                    x=["30 days", "60 days", "90 days"],
-                    y=y_vals,
-                    name=PUBLIC_SHORT[regime],
-                    marker_color=REGIME_COLORS[regime],
-                    hovertemplate=f"{PUBLIC_LABELS[regime]}<br>%{{y:.0%}}<extra></extra>",
-                ))
-
-            fig.update_layout(
-                barmode="stack",
-                height=420,
-                margin=dict(l=10, r=10, t=10, b=10),
-                yaxis=dict(title="Probability", tickformat=".0%", range=[0, 1], gridcolor="rgba(255,255,255,.10)"),
-                xaxis=dict(title="Forecast horizon"),
-                legend=dict(orientation="h", y=1.12),
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                font=dict(color="#edf4f7"),
-            )
-            st.plotly_chart(fig, use_container_width=True)
-
-        with c_stoch2:
-            st.markdown('<div class="card">', unsafe_allow_html=True)
-            st.markdown('<div class="kicker">Hydrologic persistence</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="big">{hydro_model["phi"]:.2f}</div>', unsafe_allow_html=True)
-            st.markdown(
-                '<div class="copy">Estimated daily flow persistence from the historical record. Higher values mean current hydrologic conditions tend to carry forward.</div>',
-                unsafe_allow_html=True
-            )
-            st.markdown(
-                '<div class="note">Prototype stochastic layer: seasonal AR(1) flow simulation plus existing water-right regime classifier.</div>',
-                unsafe_allow_html=True
-            )
-            st.markdown('</div>', unsafe_allow_html=True)
-
-        with st.expander("Hydrology autocorrelation and cross-correlation diagnostics"):
-            col_a, col_b = st.columns(2)
-            with col_a:
-                st.write("Autocorrelation")
-                st.dataframe(hydro_model["autocorr"], use_container_width=True)
-            with col_b:
-                st.write("Cross-correlation")
-                st.dataframe(hydro_model["crosscorr"], use_container_width=True)
-
-    except Exception as e:
-        st.warning(f"Stochastic hydrology outlook could not load: {e}")
-
-    st.markdown("### Annual regime history: 2005–present")
-    annual = annual.rename(columns={annual.columns[0]: "year"}) if annual.columns[0] != "year" else annual
-    plot_annual = annual[annual["year"] >= 2005].copy()
-
-    fig = go.Figure()
-    for regime in REGIME_ORDER:
-        if regime in plot_annual.columns:
-            fig.add_trace(go.Bar(
-                x=plot_annual["year"].astype(str),
-                y=plot_annual[regime],
-                name=PUBLIC_SHORT[regime],
-                marker_color=REGIME_COLORS[regime],
-                hovertemplate=f"{PUBLIC_LABELS[regime]}<br>%{{y}} days<extra></extra>",
-            ))
-    fig.update_layout(
-        barmode="stack",
-        height=450,
-        margin=dict(l=10, r=10, t=20, b=10),
-        yaxis=dict(title="Days", gridcolor="rgba(255,255,255,.10)"),
-        xaxis=dict(title="Year"),
-        legend=dict(orientation="h", y=1.13),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="#edf4f7"),
-    )
-    st.plotly_chart(fig, use_container_width=True)
+st.plotly_chart(fig_annual, use_container_width=True, key="annual_regime_history_2005_present")
 
 
 with st.expander("About this prototype"):
