@@ -1320,6 +1320,20 @@ def get_model_row_for_date(model_df, selected_date):
 
 st.sidebar.title("Scenario")
 
+st.markdown("""
+<style>
+/* Flatten the top snapshot area: no rounded horizontal bubble cards above data */
+[data-testid="column"] > div:has(> div > div > p) {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+hr {
+    opacity: 0.55;
+}
+</style>
+""", unsafe_allow_html=True)
+
 use_live_dashboard = True
 date_choice = st.sidebar.date_input(
     "Choose a historical date",
@@ -1374,33 +1388,35 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-c1, c2, c3 = st.columns(3)
-with c1:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="kicker">Today’s condition</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="big" style="color:{REGIME_COLORS[current_regime]};">{public_label}</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="copy">{public_explain}</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
 
-with c2:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="kicker">How unusual is today?</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="big">{hist_pct:.0f}th percentile</div>', unsafe_allow_html=True)
-    marker = max(0, min(100, hist_pct))
-    st.markdown(f"""
-    <div class="gauge-wrap">
-      <div class="gauge-track"><div class="gauge-marker" style="left:calc({marker:.1f}% - 2px);"></div></div>
-      <div class="gauge-labels"><span>Wet / available</span><span>Typical</span><span>Severe</span></div>
-    </div>
-    """, unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+st.markdown("### Current Water Right Snapshot")
 
-with c3:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="kicker">30-day outlook</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="big" style="color:{REGIME_COLORS[most_likely]};">{most_likely_public}</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="copy">Most likely outcome: {prob_series.iloc[0]:.0%} probability.</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+snap1, snap2, snap3 = st.columns(3)
+with snap1:
+    st.markdown("**Today’s condition**")
+    st.markdown(
+        f"<span style='font-size:28px;font-weight:850;color:{REGIME_COLORS[current_regime]};'>{public_label}</span>",
+        unsafe_allow_html=True,
+    )
+    st.caption(public_explain)
+
+with snap2:
+    st.markdown("**Same-day call depth**")
+    st.markdown(
+        f"<span style='font-size:28px;font-weight:850;color:#f3f7f9;'>{hist_pct:.0f}th percentile</span>",
+        unsafe_allow_html=True,
+    )
+    st.caption("Compared with historical conditions for this same day of year.")
+
+with snap3:
+    st.markdown("**30-day outlook**")
+    st.markdown(
+        f"<span style='font-size:28px;font-weight:850;color:{REGIME_COLORS[most_likely]};'>{most_likely_public}</span>",
+        unsafe_allow_html=True,
+    )
+    st.caption(f"Most likely outcome: {prob_series.iloc[0]:.0%} probability.")
+
+st.markdown("<hr style='border:0;border-top:1px solid rgba(255,255,255,.10);margin:18px 0 22px;'>", unsafe_allow_html=True)
 
 st.markdown("")
 

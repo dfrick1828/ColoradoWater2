@@ -98,3 +98,8 @@ Removed the user option to disable live CDSS data. The dashboard now always atte
 ## Latest change
 
 Removed/suppressed remaining long horizontal divider/bubble elements above the dashboard data, including hero-footer, badge, pill, status-pill, and metric-row elements.
+
+
+## Latest change
+
+Removed the rounded top snapshot cards/bubbles above the dashboard data and replaced them with a flat text-based Current Water Right Snapshot.
