@@ -172,3 +172,20 @@ Added a Well Permit Search engine:
 - points to CDSS `/api/v2/wellpermits/wellpermitactionhistory`;
 - supports permit number, receipt number, and county searches;
 - previews well permit records and action history when available.
+
+
+## Latest fix
+Moved the Well Permit Search UI into the visible dashboard flow before the 30-Day Outlook chart and added unique input keys.
+
+
+## Latest change
+
+Added a Decree Document Access engine:
+- normalizes case numbers to the four-digit CW search format used in DWR/Laserfiche tutorials;
+- links directly to DWR Research Records;
+- links directly to the public Laserfiche Weblink entry point;
+- links to Colorado Water Courts;
+- provides step-by-step decree search instructions;
+- previews CDSS water-right transaction metadata and any `caseNumberUrl` values returned by CDSS.
+
+This links to the decree document system. It does not yet ingest or display full OCR text inside the app because the public document/OCR endpoint is not exposed as a simple REST endpoint in the same way as water-right transaction metadata.

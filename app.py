@@ -1642,6 +1642,126 @@ def render_well_permit_search_engine():
         st.info("Enter a permit number, receipt number, or county to preview well permit records. The API links above update as you type.")
 
 
+
+# -----------------------------
+# Decree document access engine
+# -----------------------------
+def normalize_water_court_case_four_digit(case_number: str) -> str:
+    """
+    Normalize for DWR/Laserfiche-style searches where the CW number often needs
+    four digits after CW.
+
+    Examples:
+    - 03CW99 -> 03CW0099
+    - 03CW099 -> 03CW0099
+    - 03CW3099 -> 03CW3099
+    - 2003CW99 -> 03CW0099
+    """
+    if case_number is None:
+        return ""
+    s = str(case_number).strip().upper()
+    s = re.sub(r"[^0-9A-Z]", "", s)
+
+    m = re.match(r"^(?:20)?(\d{2})CW0*(\d+)$", s)
+    if m:
+        yy, num = m.groups()
+        return f"{yy}CW{int(num):04d}"
+
+    m = re.match(r"^(\d{4})CW0*(\d+)$", s)
+    if m:
+        yyyy, num = m.groups()
+        return f"{yyyy[-2:]}CW{int(num):04d}"
+
+    return s
+
+
+def dwr_research_records_url() -> str:
+    """
+    DWR Research Records landing page. This is the public entry point to
+    Laserfiche Weblink / imaged documents.
+    """
+    return "https://dwr.colorado.gov/services/records-research"
+
+
+def dwr_laserfiche_weblink_url() -> str:
+    """
+    Public DWR Laserfiche Weblink landing page. The exact search form is session-based,
+    so this link opens the document search interface.
+    """
+    return "https://dnrweblink.state.co.us/dwr/"
+
+
+def colorado_water_courts_url() -> str:
+    return "https://www.coloradojudicial.gov/water-courts"
+
+
+def render_decree_document_access_engine():
+    st.markdown("### Decree Document Access")
+    st.caption(
+        "Open the public DWR imaged-record system for water court decrees. "
+        "Use the normalized case number in the Laserfiche Water Court search."
+    )
+
+    dc1, dc2, dc3 = st.columns([0.46, 0.27, 0.27])
+    with dc1:
+        decree_case_input = st.text_input(
+            "Water court case number",
+            value="03CW099",
+            placeholder="Example: 03CW099",
+            key="decree_case_number_visible",
+        )
+    with dc2:
+        decree_division = st.selectbox(
+            "Water division",
+            ["Division 1", "Division 2", "Division 3", "Division 4", "Division 5", "Division 6", "Division 7", "Unknown"],
+            index=0,
+            key="decree_division_visible",
+        )
+    with dc3:
+        normalized_decree_case = normalize_water_court_case_four_digit(decree_case_input)
+        st.markdown('<div class="kicker">Search as</div>', unsafe_allow_html=True)
+        st.markdown(f"<div class='big' style='font-size:24px;'>{normalized_decree_case}</div>", unsafe_allow_html=True)
+
+    link_a, link_b, link_c = st.columns(3)
+    with link_a:
+        st.link_button("Open DWR Research Records", dwr_research_records_url(), use_container_width=True)
+    with link_b:
+        st.link_button("Open Laserfiche Weblink", dwr_laserfiche_weblink_url(), use_container_width=True)
+    with link_c:
+        st.link_button("Open Water Courts", colorado_water_courts_url(), use_container_width=True)
+
+    st.info(
+        f"To find the decree: open Laserfiche Weblink → choose **Water Court** → select **{decree_division}** "
+        f"if known → search **Case Number: {normalized_decree_case}** → open the document labeled **Decree**."
+    )
+
+    # Reuse transaction metadata fetch if it exists. This gives context plus caseNumberUrl candidates.
+    if "fetch_case_transactions" in globals():
+        try:
+            tx, request_url = fetch_case_transactions(normalized_decree_case, None)
+            st.caption(f"Transaction metadata request: {request_url}")
+            if tx.empty:
+                st.warning("No transaction metadata returned for this case number.")
+            else:
+                st.success(f"Found {len(tx):,} transaction record(s) connected to {normalized_decree_case}.")
+                preferred_cols = [
+                    "caseNumber", "caseNumberUrl", "wdid", "structureName", "waterDistrict",
+                    "waterSource", "appropriationDate", "signatureDate", "adminNumber",
+                    "decreedUses", "maxDecreedRate", "maxDecreedVolume"
+                ]
+                cols = [c for c in preferred_cols if c in tx.columns]
+                st.dataframe(tx[cols] if cols else tx, use_container_width=True, height=240)
+
+                if "caseNumberUrl" in tx.columns:
+                    urls = [u for u in tx["caseNumberUrl"].dropna().astype(str).unique() if u and u.lower() != "nan"]
+                    if urls:
+                        st.markdown("**Case URLs returned by CDSS:**")
+                        for i, u in enumerate(urls[:10], start=1):
+                            st.markdown(f"{i}. [{u}]({u})")
+        except Exception as e:
+            st.caption(f"Transaction metadata preview not loaded: {e}")
+
+
 def render_case_link_engine():
     st.markdown("### Water Court Case Link")
     st.caption("Enter a case number to open CDSS transaction records and preview the associated water-right transaction metadata.")
@@ -1695,6 +1815,77 @@ def render_case_link_engine():
     except Exception as e:
         st.warning(f"Could not fetch case transactions from CDSS: {e}")
         st.caption("The direct CDSS and REST links above are still available.")
+
+
+def render_well_permit_search_engine():
+    st.markdown("### Well Permit Search")
+    st.caption("Search CDSS well permits and open the underlying REST API calls.")
+
+    w1, w2, w3 = st.columns([0.45, 0.30, 0.25])
+    with w1:
+        permit_input = st.text_input("Permit number", value="", placeholder="Example: 12345-F", key="well_permit_number_visible")
+    with w2:
+        receipt_input = st.text_input("Receipt number", value="", placeholder="Optional", key="well_receipt_number_visible")
+    with w3:
+        county_input = st.text_input("County", value="", placeholder="Optional", key="well_county_visible")
+
+    permit_norm = normalize_well_permit_number(permit_input)
+
+    link_col1, link_col2 = st.columns(2)
+    with link_col1:
+        st.link_button(
+            "Open Well Permit REST API",
+            cdss_well_permit_rest_url(permit_norm, receipt_input, county_input),
+            use_container_width=True,
+        )
+    with link_col2:
+        st.link_button(
+            "Open Permit Action History REST API",
+            cdss_well_permit_action_rest_url(permit_norm, receipt_input),
+            use_container_width=True,
+        )
+
+    run_search = bool(permit_norm or receipt_input.strip() or county_input.strip())
+
+    if run_search:
+        try:
+            permits, permit_url = fetch_well_permits(permit_norm, receipt_input, county_input)
+            st.caption(f"Permit REST request: {permit_url}")
+
+            if permits.empty:
+                st.warning("No well permit records returned for this search.")
+            else:
+                st.success(f"Found {len(permits):,} well permit record(s).")
+                preferred_cols = [
+                    "permitNumber", "receipt", "wellName", "county", "division", "waterDistrict",
+                    "managementDistrict", "designatedBasin", "permitStatus", "permitType",
+                    "use", "totalDepth", "staticWaterLevel", "latitude", "longitude",
+                    "dateIssued", "dateCompleted", "parcelName"
+                ]
+                cols = [c for c in preferred_cols if c in permits.columns]
+                st.dataframe(permits[cols] if cols else permits, use_container_width=True, height=260)
+
+        except Exception as e:
+            st.warning(f"Could not fetch well permit records from CDSS: {e}")
+
+        try:
+            actions, action_url = fetch_well_permit_actions(permit_norm, receipt_input)
+            st.caption(f"Action history REST request: {action_url}")
+
+            if not actions.empty:
+                with st.expander("Well permit action history"):
+                    preferred_action_cols = [
+                        "permitNumber", "receipt", "actionDate", "actionName",
+                        "actionComment", "permitStatus", "wellName"
+                    ]
+                    action_cols = [c for c in preferred_action_cols if c in actions.columns]
+                    st.dataframe(actions[action_cols] if action_cols else actions, use_container_width=True, height=260)
+
+        except Exception as e:
+            st.caption(f"Action history not loaded: {e}")
+    else:
+        st.info("Enter a permit number, receipt number, or county to preview well permit records. The API links above update as you type.")
+
 
 st.sidebar.title("Scenario")
 
@@ -1913,6 +2104,9 @@ with h2:
     st.markdown('<div class="copy">Based on recent administrative severity near this point in the season.</div>', unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
+
+
+render_well_permit_search_engine()
 
 st.markdown("### 30-Day Water Rights Outlook")
 
