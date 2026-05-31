@@ -141,3 +141,8 @@ Replaced the hero background with a local Cache la Poudre River canyon image sto
 
 - Removed Severity Score from the dashboard.
 - Replaced flow percentile with percent of average flow for the selected/current date based on historical records for the same day of year.
+
+
+## Latest fix
+
+Replaced the inline Streamlit conditional for percent-of-average flow with a normal if/else block so Streamlit does not render a DeltaGenerator object.

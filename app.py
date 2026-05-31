@@ -1561,17 +1561,21 @@ h1, h2 = st.columns(2)
 with h1:
     st.markdown('<div class="kicker">Canyon-Mouth Flow</div>', unsafe_allow_html=True)
     st.markdown(f'<div class="big" style="font-size:30px;">{flow_cfs:,.0f} cfs</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="copy">{flow_pct_avg:.0f}% of average for this date</div>', unsafe_allow_html=True) if flow_pct_avg is not None else st.markdown('<div class="copy">Average flow unavailable</div>', unsafe_allow_html=True)
+    if flow_pct_avg is not None:
+    st.markdown(
+        f'<div class="copy">{flow_pct_avg:.0f}% of average for this date</div>',
+        unsafe_allow_html=True,
+    )
+else:
+    st.markdown(
+        '<div class="copy">Average flow unavailable</div>',
+        unsafe_allow_html=True,
+    )
 
 with h2:
     st.markdown('<div class="kicker">Comparable Years</div>', unsafe_allow_html=True)
     st.markdown(f'<div class="big" style="font-size:30px;">{", ".join(comps) if comps else "—"}</div>', unsafe_allow_html=True)
     st.markdown('<div class="copy">Based on recent administrative severity near this point in the season.</div>', unsafe_allow_html=True)
-
-with h3:
-    st.markdown('<div class="kicker"></div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="big" style="font-size:30px;">{score:.0f}/100</div>', unsafe_allow_html=True)
-    st.markdown('<div class="copy"></div>', unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
