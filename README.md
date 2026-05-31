@@ -147,3 +147,7 @@ Renamed application to Water Outlook and added explanatory footnote.
 ## Latest change
 
 Replaced fragile CSS background image with a reliable Streamlit `st.image()` call using `assets/poudre_river_hero.jpg`.
+
+
+## Latest change
+Poudre River image is embedded as a base64 CSS background behind the Water Outlook hero title.

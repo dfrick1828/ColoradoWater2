@@ -313,35 +313,37 @@ st.markdown("""
 [data-testid="stHeader"] { background: rgba(0,0,0,0); }
 .block-container { padding-top: 1.7rem; padding-bottom: 3rem; max-width: 1220px; }
 
+
 .hero {
+  min-height: 430px;
   border: 1px solid rgba(255,255,255,.13);
-  border-radius: 28px;
-  padding: 30px;
-  background: linear-gradient(180deg, rgba(255,255,255,.065), rgba(255,255,255,.025));
-  box-shadow: 0 20px 70px rgba(0,0,0,.30);
-  margin-bottom: 22px;
-}
-.eyebrow {
-  color: #5ec9df;
-  text-transform: uppercase;
-  letter-spacing: .20em;
-  font-weight: 900;
-  font-size: 12px;
+  border-radius: 30px;
+  padding: 42px;
+  background:
+    linear-gradient(90deg, rgba(3,10,15,.88), rgba(3,10,15,.60), rgba(3,10,15,.18)),
+    var(--poudre-bg);
+  background-size: cover;
+  background-position: center;
+  box-shadow: 0 28px 90px rgba(0,0,0,.40);
+  margin-bottom: 26px;
+  position: relative;
+  overflow: hidden;
 }
 .hero h1 {
-  font-size: 66px;
+  font-size: 62px;
   line-height: .92;
   letter-spacing: -.065em;
-  margin: 18px 0 18px;
+  margin: 18px 0 16px;
   color: #f5fafc;
-  max-width: 920px;
+  max-width: 820px;
 }
 .hero p {
   max-width: 760px;
-  font-size: 22px;
+  font-size: 19px;
   line-height: 1.45;
   color: #dbe8ee;
 }
+
 .hero-footer {
   position:absolute;
   left:42px;
@@ -1442,24 +1444,18 @@ most_likely = prob_series.index[0]
 most_likely_public = PUBLIC_LABELS[most_likely]
 
 
-if Path("assets/poudre_river_hero.jpg").exists():
-    st.image("assets/poudre_river_hero.jpg", use_container_width=True)
+
+poudre_img64 = image_to_base64("assets/poudre_river_hero.jpg")
+poudre_bg = f"url('data:image/jpeg;base64,{poudre_img64}')" if poudre_img64 else "none"
 
 st.markdown(f"""
-<div class="hero">
+<div class="hero" style="--poudre-bg: {poudre_bg};">
   <div class="eyebrow">Historical-data prototype</div>
   <h1>Water Outlook</h1>
-  <p></p>
+  <p>Water Outlook combines live Colorado water-right administration data, historical streamflow, and historical river conditions to help explain water availability and administration over the next 30 days. This is an informational tool and not an official forecast or administrative determination.</p>
 </div>
 </div>
 """, unsafe_allow_html=True)
-
-st.caption(
-    "Water Outlook combines live Colorado water-right administration data, historical streamflow, and historical river conditions to help explain water availability and administration over the next 30 days. This is an informational tool and not an official forecast or administrative determination."
-)
-
-
-
 
 st.markdown("### Current Water Right Snapshot")
 
