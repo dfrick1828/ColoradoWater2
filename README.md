@@ -72,3 +72,8 @@ Annual regime history chart restored to 2005–present.
 ## Clean stochastic rebuild
 
 Rebuilt from the stable pre-stochastic app. The stochastic UI is inserted only after `daily`, `annual`, `flow`, `model_df`, `clf`, `le`, and `row` exist.
+
+
+## Latest change
+
+Removed the public landing page. The app now opens directly to the Water Right Outlook dashboard.

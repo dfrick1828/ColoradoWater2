@@ -1290,12 +1290,7 @@ daily, annual, flow = load_data()
 model_df = prepare_model_dataset(daily, flow)
 clf, le = train_model(model_df)
 
-page = st.sidebar.radio(
-    "View",
-    ["Public Landing Page", "Outlook Dashboard"],
-    index=0,
-)
-
+page = "Outlook Dashboard"
 latest_available = daily["date"].max()
 today_date = pd.Timestamp.today().normalize()
 default_date = today_date
@@ -1312,118 +1307,6 @@ def get_model_row_for_date(model_df, selected_date):
         return same_doy.sort_values("date").iloc[[-1]]
     return model_df.sort_values("date").iloc[[-1]]
 
-if page == "Public Landing Page":
-    live_mode = st.sidebar.toggle("Use live CDSS active calls", value=True)
-    live_status_message = "Historical snapshot"
-
-    landing_date = pd.Timestamp.today().normalize()
-    landing_row = get_model_row_for_date(model_df, landing_date)
-
-    if live_mode:
-        try:
-            live_calls, live_url, live_status_message = fetch_live_active_calls()
-            current_state = build_live_current_state(live_calls)
-            landing_row, raw_land, adj_land = build_forecast_from_state(model_df, clf, le, current_state, landing_date)
-            landing_regime = current_state["regime"]
-            landing_pct = float((model_df["score"].dropna() <= current_state["score"]).mean() * 100)
-            landing_score = float(current_state["score"])
-            priority_display = current_state["controlling_priority_date"]
-            structure_display = current_state["controlling_priority_structure"]
-        except Exception as e:
-            live_mode = False
-            live_status_message = f"Live CDSS unavailable; using historical snapshot. Error: {e}"
-
-    if not live_mode:
-        landing_regime = landing_row.iloc[0]["regime"]
-        landing_pct = float(landing_row.iloc[0]["historical_percentile"])
-        landing_score = float(landing_row.iloc[0]["score"])
-        priority_display = landing_row.iloc[0].get("controlling_priority_date", "—")
-        structure_display = landing_row.iloc[0].get("controlling_priority_structure", "—")
-        X_land = landing_row[FEATURES].fillna(model_df[FEATURES].median(numeric_only=True))
-        land_prob = clf.predict_proba(X_land)[0]
-        raw_land = pd.Series(land_prob, index=le.inverse_transform(np.arange(len(land_prob)))).reindex(REGIME_ORDER, fill_value=0)
-        adj_land = apply_expert_probability_overlay(raw_land, landing_regime, landing_date).sort_values(ascending=False)
-
-    landing_public = PUBLIC_LABELS[landing_regime]
-    marker = max(0, min(100, landing_pct))
-    most_likely = adj_land.index[0]
-    most_likely_public = PUBLIC_LABELS[most_likely]
-    comps = comparable_years(model_df, landing_date, landing_score)
-    comp_text = ", ".join(comps) if comps else "not enough history"
-
-    narrative = (
-        f"Northern Colorado water-right pressure is currently higher than {landing_pct:.0f}% "
-        f"of daily conditions since 2005. Conditions most closely resemble {comp_text}, "
-        f"with the 30-day outlook favoring {most_likely_public.lower()}."
-    )
-
-    img64 = image_to_base64("assets/poudre_river_hero.jpg")
-    if img64:
-        bg = f"url('data:image/jpeg;base64,{img64}')"
-    else:
-        bg = "url('https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1800&q=80')"
-
-    st.markdown(f"""
-    <div class="beta-hero" style="--poudre-bg: {bg};">
-      <div class="beta-brand">Water Right Outlook</div>
-      <div class="beta-title">Understanding water-right administration today and what may happen next.</div>
-      <div class="beta-subtitle">A public outlook for water-right administration based on historical calls, current conditions, and forecasted administrative regimes.</div>
-      <div class="beta-status">
-        <div class="beta-panel">
-          <div class="beta-panel-label">Current water-right pressure</div>
-          <div class="beta-score">{landing_pct:.0f}<span style="font-size:32px;color:#aebbc4;"> / 100</span></div>
-          <div class="beta-track"><div class="beta-marker" style="left:calc({marker:.1f}% - 2px);"></div></div>
-          <div class="beta-scale"><span>Low</span><span>Typical</span><span>High</span></div>
-        </div>
-        <div class="beta-panel">
-          <div class="beta-panel-label">Water Right Outlook</div>
-          <div class="beta-narrative">{narrative}</div>
-          <div class="beta-meta">
-            <span class="beta-pill">Current: {landing_public}</span>
-            <span class="beta-pill">Similar years: {comp_text}</span>
-            <span class="beta-pill">30-day: {most_likely_public}</span>
-            <span class="beta-pill">Source: {"Live CDSS" if live_mode else "Historical snapshot"}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown(f"""
-    <div class="beta-section">
-      <h2>How it works</h2>
-      <p>The Outlook turns technical water-right administration into a plain-English signal.</p>
-      <div class="beta-flow">
-        <div class="beta-flow-step"><strong>Live active calls</strong><span>CDSS active calls show today's administrative condition.</span></div>
-        <div class="beta-flow-step"><strong>Daily regimes</strong><span>Each day is classified as available, mild, typical, senior, or exceptional.</span></div>
-        <div class="beta-flow-step"><strong>Stress score</strong><span>Each day receives a 0–100 water-right pressure score.</span></div>
-        <div class="beta-flow-step"><strong>Forecast model</strong><span>Historical patterns estimate the likely condition 30 days ahead.</span></div>
-        <div class="beta-flow-step"><strong>Expert rules</strong><span>Water-right knowledge constrains the model to realistic outcomes.</span></div>
-      </div>
-      <p style="margin-top:16px;color:#aebbc4;font-size:14px;">Status: {live_status_message}</p>
-    </div>
-    <div class="beta-section">
-      <h2>Why water rights matter</h2>
-      <p>Water rights are not an abstract legal concept. They shape how water moves through Northern Colorado.</p>
-      <div class="beta-grid-four">
-        <div class="beta-impact"><div class="icon">🚜</div><h3>Agriculture</h3><p>Ditches and farms depend on priority administration during the growing season.</p></div>
-        <div class="beta-impact"><div class="icon">🏙️</div><h3>Cities</h3><p>Municipal supply depends on rights, storage, exchanges, and timing.</p></div>
-        <div class="beta-impact"><div class="icon">🏞️</div><h3>Rivers</h3><p>Administration affects flows, diversions, storage, and dry-year conditions.</p></div>
-        <div class="beta-impact"><div class="icon">🏌️</div><h3>Communities</h3><p>Boards, residents, and local decision makers need understandable water signals.</p></div>
-      </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    with st.expander("Live CDSS diagnostics"):
-        st.write("Live mode:", live_mode)
-        st.write("Status:", live_status_message)
-        if live_mode:
-            st.write("URL:", live_url)
-            st.dataframe(live_calls.head(100), use_container_width=True)
-
-    st.info("Use the sidebar to switch to the Outlook Dashboard.")
-    st.stop()
-
 st.sidebar.title("Scenario")
 use_live_dashboard = st.sidebar.toggle("Use live CDSS active calls on dashboard", value=False)
 date_choice = st.sidebar.date_input(
@@ -1433,6 +1316,14 @@ date_choice = st.sidebar.date_input(
     max_value=max(latest_available, today_date).date(),
 )
 selected_date = pd.Timestamp(date_choice)
+
+st.markdown("""
+<div class="hero">
+  <div class="eyebrow">Water Right Outlook</div>
+  <h1>Water Right Outlook</h1>
+  <p>Understanding water-right administration today and what may happen next.</p>
+</div>
+""", unsafe_allow_html=True)
 
 row = get_model_row_for_date(model_df, selected_date)
 
