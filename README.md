@@ -82,3 +82,8 @@ Removed the public landing page. The app now opens directly to the Water Right O
 ## Latest change
 
 Removed the duplicate/second header from the dashboard build.
+
+
+## Latest change
+
+Removed the user option to disable live CDSS data. The dashboard now always attempts to use live CDSS active calls. The historical data remains the model backbone and emergency fallback if CDSS is unavailable.

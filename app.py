@@ -1308,7 +1308,8 @@ def get_model_row_for_date(model_df, selected_date):
     return model_df.sort_values("date").iloc[[-1]]
 
 st.sidebar.title("Scenario")
-use_live_dashboard = st.sidebar.toggle("Use live CDSS active calls on dashboard", value=False)
+st.sidebar.caption("Live CDSS active calls are always on.")
+use_live_dashboard = True
 date_choice = st.sidebar.date_input(
     "Choose a historical date",
     value=default_date.date(),
