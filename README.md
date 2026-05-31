@@ -163,3 +163,12 @@ Added a Water Court Case Link engine:
 - displays CDSS `caseNumberUrl` candidates when returned by the API.
 
 This does not yet ingest the full decree/OCR text; it creates direct linkage from the website to court case transaction records and any case URLs returned by CDSS.
+
+
+## Latest change
+
+Added a Well Permit Search engine:
+- points to CDSS `/api/v2/wellpermits/wellpermit`;
+- points to CDSS `/api/v2/wellpermits/wellpermitactionhistory`;
+- supports permit number, receipt number, and county searches;
+- previews well permit records and action history when available.
