@@ -138,3 +138,7 @@ Rebuilt from the stable simplified-top-metrics version.
 - Removed Severity Score.
 - Replaced flow percentile with percent of average for the same day of year.
 - Fixed Streamlit/indentation issue by using a proper if/else block inside the flow column.
+
+
+## Rebrand
+Renamed application to Water Outlook and added explanatory footnote.

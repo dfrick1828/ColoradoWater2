@@ -18,7 +18,7 @@ def image_to_base64(path):
     return base64.b64encode(p.read_bytes()).decode("utf-8")
 
 st.set_page_config(
-    page_title="Water Right Outlook",
+    page_title="Water Outlook",
     page_icon="💧",
     layout="wide",
 )
@@ -1450,11 +1450,16 @@ most_likely_public = PUBLIC_LABELS[most_likely]
 st.markdown(f"""
 <div class="hero">
   <div class="eyebrow">Historical-data prototype</div>
-  <h1>Water Right Outlook</h1>
+  <h1>Water Outlook</h1>
   <p>Making Colorado water rights understandable — by translating river administration into a plain-English outlook.</p>
 </div>
 </div>
 """, unsafe_allow_html=True)
+
+st.caption(
+    "Water Outlook combines live Colorado water-right administration data, historical streamflow, and historical river conditions to help explain water availability and administration over the next 30 days. This is an informational tool and not an official forecast or administrative determination."
+)
+
 
 
 
@@ -1463,7 +1468,7 @@ st.markdown("### Current Water Right Snapshot")
 top1, top2, top3 = st.columns(3)
 
 with top1:
-    st.markdown('<div class="kicker">Current Condition</div>', unsafe_allow_html=True)
+    st.markdown('<div class="kicker">Water Outlook</div>', unsafe_allow_html=True)
     st.markdown(
         f'<div class="big" style="color:{REGIME_COLORS[current_regime]};">{public_label}</div>',
         unsafe_allow_html=True,
